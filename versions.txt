@@ -75,3 +75,8 @@ Fixed rmb menu
 --- 0.9.10 ---
 install instructions
 startup script
+
+--- 0.9.11 ---
+Export and Import selected icons
+.gitignore file
+Git storage
