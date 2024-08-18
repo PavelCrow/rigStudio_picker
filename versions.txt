@@ -80,3 +80,4 @@ startup script
 Export and Import selected icons
 .gitignore file
 Git storage
+Added reset mel script

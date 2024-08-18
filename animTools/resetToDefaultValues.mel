@@ -1,0 +1,89 @@
+//
+//  Nival Interactive Script File
+//
+//  Creation Date:	15 June 2005
+//
+//  Idea: 		Alexey Borzykh AKA NURB
+//  Design:		Andrew Chernyshov AKA Ancher
+//  Programming:	Andrew Chernyshov AKA Ancher
+//
+//  Description:
+//	This script is used to reset all keyable
+//	attributes of the selected objects to their
+//	default values.
+//
+//	Character sets are also supported!
+//
+
+global proc resetToDefaultValues()
+{
+	string $keyableUnlockedAttributes[];
+	catchQuiet( `logScript "resetToDefaultValues"` );
+
+	// Let's collect all keyable attributes into one array
+	string $list[] = `ls -selection`;
+
+	if ( size( $list ) == 0 )
+	{
+		warning "Nothing selected!";
+		return;
+	}
+
+	for( $item in $list )
+	{
+		if ( `objectType -isType character $item` )
+		{
+			resetCharacterSet( $item );
+		}
+		else
+		{
+			//print( "item=" + $item + "\n" );
+			$keyableUnlockedAttributes = `listAttr -keyable -unlocked -scalar $item`;
+			if( !size( $keyableUnlockedAttributes ) ) {
+				continue;
+			}
+			for ( $a in $keyableUnlockedAttributes )
+			{
+				catchQuiet( resetAttribute( $item + "." + $a ) );
+			}
+		}
+	}
+	// print "reset 00";
+	// Reset control to saved data
+	python "import rs_keepPos";
+	python "reload(rs_keepPos)";
+	python "rs_keepPos.loadPos()";
+
+}
+
+global proc resetCharacterSet( string $char )
+{
+	for ( $item in `sets -query $char` )
+	{
+		if ( `objectType -isType character $item` )
+		{
+			resetCharacterSet( $item );
+		}
+
+		resetAttribute( $item );
+	}
+}
+
+global proc resetAttribute( string $attr )
+{
+		string $tmp[], $cmd;
+		tokenize( $attr, ".", $tmp);
+
+		if ( size( $tmp ) != 2 )
+		{
+			return;
+		}
+		$result = `attributeQuery -listDefault -node $tmp[0] $tmp[1]`;
+
+		//print( "  attr=" + $attr + " node=" + $tmp[0] + " ln=" + $tmp[1] + " value=" + $result[0] + "\n" );
+		$cmd = "setAttr " + $attr + " " + $result[0];
+		//print( "cmd: " + $cmd + "\n" );
+		//setAttr $attr $result[0];
+		//evalDeferred( $cmd );
+		eval( $cmd );
+}
