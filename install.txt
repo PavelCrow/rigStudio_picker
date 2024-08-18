@@ -1,0 +1,15 @@
+1. Copy rigStudio folder to maya sripts folder
+2. Drag and drop install.py file into the Maya viewport for creating shelf button, 
+or create it manually with python command:
+
+Picker (animation mode):
+import rigStudio_picker.picker
+rigStudio_picker.picker.main.run()
+
+Picker (edit mode):
+import rigStudio_picker.picker
+rigStudio_picker.picker.main.run(edit=True)
+
+
+
+import rigStudio_picker.picker_icon

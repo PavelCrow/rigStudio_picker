@@ -1,0 +1,77 @@
+--- 0.9 ---
+Standalone picker
+
+--- 0.9.1 ---
+Selection off fix in atribute editor
+
+--- 0.9.2 ---
+Small UI updates
+
+--- 0.9.2 ---
+Restore working with references
+
+--- 0.9.3 ---
+added shape detalisation option
+added path type option
+fixed working with several references
+removed "picker" from character name
+then select icon and move it, options was not updating - fixed
+ctrs and shift now is working
+text now working with layers
+mirrored icon snap to his position
+if picker exists in the scene, references with pickers was not working - fixed
+errors warning improved
+fixed selection error warning after closing a picker window
+update selection option now disabled by default
+fixed sliders removing
+fixed right click on the mirrored icon
+now deleting the mirror source deleting the mirrored icon also
+fixed flip icon
+
+--- 0.9.4 ---
+restore reset scale in animation mode
+added menu
+changed visibility define of the items 
+
+--- 0.9.5 ---
+Fixed wrong order of selected controls
+
+--- 0.9.6 ---
+Fixed moving mirrored item in edit mode
+
+--- 0.9.7 ---
+fixed removing sliders
+fixed removing layer
+fixed hiding slider items by layer
+fixed add external layer with several tabs
+fixed running script buttons with mouse sliding
+fix selections by area with 0 pixel in one of sides
+fix border trailing in edit mode
+selection area fix
+
+--- 0.9.8 ---
+fixed loading included references
+added changed panels size
+saved scale and positions of the views between characters
+resetZoom button reset only current view
+reload picker on scene opened, load and unload reference
+update view on time change
+fixed reloading after switch panels
+saving sizes of panels
+
+--- 0.9.9 ---
+rewrited double click selections 
+add and remove from selections now works with control button
+added rotate polygon buttons
+selection sets now writed to one undo
+fixed views update by the timeline
+zoom now work with alt button as in maya viewport
+fixed unvisible rubber band
+fixed several 
+fixed right menu opening in edit mode
+fixed selections
+Fixed rmb menu
+
+--- 0.9.10 ---
+install instructions
+startup script

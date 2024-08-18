@@ -1,0 +1,14 @@
+# *.py[cod]
+# *$py.class
+# share/python-wheels/
+
+*.psd
+__pycache__/ 
+.vscode/
+.idea/
+_old/
+Animaccord/
+Banana/
+incrementalSave
+rigStudio3.code-workspace
+.mayaSwatches
