@@ -50,9 +50,9 @@ global proc resetToDefaultValues()
 	}
 	// print "reset 00";
 	// Reset control to saved data
-	python "import rs_keepPos";
-	python "reload(rs_keepPos)";
-	python "rs_keepPos.loadPos()";
+	//python "import rs_keepPos";
+	//python "reload(rs_keepPos)";
+	//python "rs_keepPos.loadPos()";
 
 }
 
