@@ -8,7 +8,7 @@ __pycache__/
 .idea/
 _old/
 Animaccord/
-Banana/
+# Banana/
 incrementalSave
 rigStudio3.code-workspace
 .mayaSwatches
