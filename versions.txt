@@ -81,3 +81,7 @@ Export and Import selected icons
 .gitignore file
 Git storage
 Added reset mel script
+
+--- 0.9.12 ---
+Mirror feature update
+Added mirror tool button

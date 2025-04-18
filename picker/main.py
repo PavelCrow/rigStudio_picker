@@ -14,7 +14,6 @@ import logging, traceback, sys
 #import picker
 #reload(picker)
 
-
 if sys.version[0] == "2":
 	import picker
 	reload(picker)
@@ -4391,6 +4390,7 @@ class MyDockingUI(QtWidgets.QWidget):
 		#self.win.layers_tableWidget.currentItemChanged.connect(self.switchLayer)
 		self.win.layers_tableWidget.cellClicked.connect(self.switchLayer)
 		self.win.about_btn.clicked.connect(self.action_about)
+		self.win.mirrorSetTool_btn.clicked.connect(self.mirrorSetTool)
 
 		self.win.selection_btn.clicked.connect(self.select_script_toggle)	
 		self.win.pythonScript_btn.clicked.connect(self.select_script_toggle)	
@@ -6770,6 +6770,38 @@ class MyDockingUI(QtWidgets.QWidget):
 		self.picker_item.slider_objects = {1:None, 2:None, 3:None, 4:None, 5:None}
 		self.updateItemFrame()
 
+	def mirrorSetTool(self):
+		def mirror():
+			import importlib
+			import rigStudio_picker.animTools.switchIkFk as switchIkFk 
+			switchIkFk.mirror()
+		
+		def symmetry():
+			import importlib
+			import rigStudio_picker.animTools.switchIkFk as switchIkFk 
+			importlib.reload(switchIkFk )
+			switchIkFk.symmetry()
+		
+		def reset():
+			import rigStudio_picker.animTools.rs_keepPos
+			rigStudio_picker.animTools.rs_keepPos.loadPos()
+
+		path = root_path.replace('\\picker', "\\ui")+'//mirrorToolWindow.ui'
+
+		self.mirrorWin = QtWidgets.QDialog(parent=self.parent())
+		self.mirrorWin = self.loadUiWidget(path, parent=self.mirrorWin)
+
+		self.mirrorWin.mirror_btn.clicked.connect(mirror)
+		self.mirrorWin.symmetry_btn.clicked.connect(symmetry)
+		self.mirrorWin.reset_btn.clicked.connect(reset)
+		self.mirrorWin.addMirrorLoc_btn.clicked.connect(utils.addMirrorLoc)
+		self.mirrorWin.addMirrorAxisAttr_btn.clicked.connect(utils.addMirrorAxisAttr)
+		self.mirrorWin.addWorldSpaceAttr_btn.clicked.connect(utils.addWorldSpaceAttr)
+		self.mirrorWin.addMirrorAxisAttrX_btn.clicked.connect(partial(utils.addMirrorAxisAttr, axis=1))
+		self.mirrorWin.addMirrorAxisAttrY_btn.clicked.connect(partial(utils.addMirrorAxisAttr, axis=2))
+		self.mirrorWin.addMirrorAxisAttrZ_btn.clicked.connect(partial(utils.addMirrorAxisAttr, axis=3))
+
+		self.mirrorWin.show()
 
 def run_dockable_old(edit=False, picker_name=None, match_rig=False, match_scene=False):
 	from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
@@ -6853,4 +6885,5 @@ def run(edit=False, rigFromJoints=None):
 	wd = picker_win.parent().parent().parent().parent().parent()
 	wd.adjustSize()
 	wd.setGeometry(x,y,w,h)
+
 
