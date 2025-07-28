@@ -8,9 +8,13 @@
 # WARNING! All changes made in this file will be lost!
 
 try:
-    from PySide2 import QtWidgets, QtGui, QtCore
+	from PySide2 import QtWidgets, QtGui, QtCore
 except:
-    from Qt import QtWidgets, QtGui, QtCore
+	try:
+		from PySide6 import QtWidgets, QtGui, QtCore
+		from shiboken6 import wrapInstance
+	except:
+		from Qt import QtWidgets, QtGui, QtCore
 
 class Ui_Dialog(object):
     def setupUi(self, Dialog):

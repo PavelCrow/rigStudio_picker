@@ -1,5 +1,6 @@
 import maya.cmds as cmds
 
+
 def incrementName(name):
 	suffix = name.split('_')[-1]
 	rootName = name[:-len(suffix)-1]
@@ -117,3 +118,13 @@ def addMirrorAxisAttr(control=None, axis=None):
 			cmds.setAttr(c+".mirrorAxis", axis)
 			if opp_c:
 				cmds.setAttr(opp_c+".mirrorAxis", axis)
+
+def getModuleNameFromHierarhy(controlName):
+	p = cmds.listRelatives(controlName, parent=1)[0]
+	while p.split('_')[-1] != "mod":
+		parents = cmds.listRelatives(p, parent=1) or []
+		if len(parents) == 0:
+			return None
+		p = parents[0]
+
+	return p[:-4]

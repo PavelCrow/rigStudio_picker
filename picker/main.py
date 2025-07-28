@@ -30,9 +30,23 @@ else:
 
 try:
 	from PySide2 import QtWidgets, QtGui, QtCore, QtUiTools
+	import PySide2.QtWidgets as QtWidgets
+	QAction = QtWidgets.QAction
 except:
-	from Qt import QtWidgets, QtGui, QtCore, QtUiTools
-try: from shiboken2 import wrapInstance
+	try:
+		from PySide6 import QtWidgets, QtGui, QtCore, QtUiTools
+		from shiboken6 import wrapInstance
+		import PySide6.QtGui as QtGui
+		QAction = QtGui.QAction
+	except:
+		from Qt import QtWidgets, QtGui, QtCore, QtUiTools
+		import Qt.QtWidgets as QtWidgets
+		QAction = QtWidgets.QAction
+try: 
+	try:
+		from shiboken6 import wrapInstance
+	except:
+		from shiboken2 import wrapInstance
 except: from shiboken import wrapInstance
 
 root_path = os.path.dirname(os.path.abspath(__file__))
@@ -269,15 +283,15 @@ class ContextMenuTabWidget(QtWidgets.QTabWidget):
 		menu = QtWidgets.QMenu(self)
 
 		# Build context menu
-		rename_action = QtWidgets.QAction("Rename", None)
+		rename_action = QAction("Rename", None)
 		rename_action.triggered.connect(self.rename_event)
 		menu.addAction(rename_action)
 
-		add_action = QtWidgets.QAction("Add Tab", None)
+		add_action = QAction("Add Tab", None)
 		add_action.triggered.connect(self.add_tab_event)
 		menu.addAction(add_action)
 
-		remove_action = QtWidgets.QAction("Remove Tab", None)
+		remove_action = QAction("Remove Tab", None)
 		remove_action.triggered.connect(self.remove_tab_event)
 		menu.addAction(remove_action)
 
@@ -527,12 +541,12 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 		# Scale view in Y for positive Y values (maya-like)
 		self.scale(1, 1)
 
-		self.setResizeAnchor(self.AnchorViewCenter)
+		# self.setResizeAnchor(self.AnchorViewCenter)
 
 		# TODO
 		# Set selection mode
 		self.setRubberBandSelectionMode(QtCore.Qt.IntersectsItemBoundingRect)
-		self.setDragMode(self.RubberBandDrag)
+		# self.setDragMode(self.RubberBandDrag)
 		self.scene_mouse_origin = QtCore.QPointF()
 		self.doubleClick_select = False
 		self.pan_active = False
@@ -589,7 +603,6 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 
 			# if picker item below mouse
 			if self.scene().itemAt(scene_pos, transform):
-				#self.setDragMode(self.RubberBandDrag)
 				item = self.scene().itemAt(scene_pos, transform)
 				item = self.getPickerItemFromItem(item)
 
@@ -612,12 +625,11 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 						elif not edit:
 							self.drag_item = None # Then area select from icon
 		else:
-			self.setDragMode(self.NoDrag)
+			self.setDragMode(self.DragMode.NoDrag)
 
 		modifiers = event.modifiers()
 		if modifiers == QtCore.Qt.AltModifier:		
 			if event.button() == QtCore.Qt.MidButton:
-				#self.setDragMode(self.NoDrag)
 				self.pan_active = True
 			if event.button() == QtCore.Qt.RightButton:	
 				self.zoom_active = True
@@ -954,7 +966,7 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 		self.item_menu = False
 		self.drag_item = None
 		self.drag_start = False
-		self.setDragMode(self.RubberBandDrag)
+		self.setDragMode(self.DragMode.RubberBandDrag)
 
 		# Middle mouse view panning
 		modifiers = event.modifiers()
@@ -1159,16 +1171,16 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 			# Build Edit move options
 			if edit:
 				#if picker_item.layer not in self.ext_layers and picker_item.layer in self.main.get_visible_internal_layers():
-				dup_action = QtWidgets.QAction("Duplicate", None)
+				dup_action = QAction("Duplicate", None)
 				dup_action.triggered.connect(self.duplicate_picker_item)
 				menu.addAction(dup_action)
-				mirror_action = QtWidgets.QAction("Create Mirror", None)
+				mirror_action = QAction("Create Mirror", None)
 				mirror_action.triggered.connect(self.mirror_picker_item)
 				menu.addAction(mirror_action)
-				flip_action = QtWidgets.QAction("Flip", None)
+				flip_action = QAction("Flip", None)
 				flip_action.triggered.connect(self.flip_picker_item)
 				menu.addAction(flip_action)
-				delete_action = QtWidgets.QAction("Delete", None)
+				delete_action = QAction("Delete", None)
 				delete_action.triggered.connect(self.delete_picker_item)
 				menu.addAction(delete_action)
 
@@ -1179,53 +1191,53 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 
 			if edit:
 				# Build Edit move options
-				polygon_action = QtWidgets.QAction("Add Polygon", None)
+				polygon_action = QAction("Add Polygon", None)
 				polygon_action.triggered.connect(partial(self.add_picker_item, event))
 				menu.addAction(polygon_action)
 				actions.append(polygon_action)				
 
-				rect_action = QtWidgets.QAction("Add Rectangle", None)
+				rect_action = QAction("Add Rectangle", None)
 				rect_action.triggered.connect(partial(self.add_rect_item, event))
 				menu.addAction(rect_action)
 				actions.append(rect_action)				
 
-				circle_action = QtWidgets.QAction("Add Circle", None)
+				circle_action = QAction("Add Circle", None)
 				circle_action.triggered.connect(partial(self.add_circle_item, event))
 				menu.addAction(circle_action)
 				actions.append(circle_action)				
 
-				label_action = QtWidgets.QAction("Add Label", None)
+				label_action = QAction("Add Label", None)
 				label_action.triggered.connect(partial(self.add_label_item, event))
 				menu.addAction(label_action)
 				actions.append(label_action)				
 
-				text_action = QtWidgets.QAction("Add Text", None)
+				text_action = QAction("Add Text", None)
 				text_action.triggered.connect(partial(self.add_text_item, event))
 				menu.addAction(text_action)
 				actions.append(text_action)				
 
-				button_action = QtWidgets.QAction("Add Button", None)
+				button_action = QAction("Add Button", None)
 				button_action.triggered.connect(partial(self.add_button_item, event))
 				menu.addAction(button_action)
 				actions.append(button_action)				
 
-				slider_action = QtWidgets.QAction("Add Slider", None)
+				slider_action = QAction("Add Slider", None)
 				slider_action.triggered.connect(partial(self.add_slider_item, event))
 				menu.addAction(slider_action)
 				actions.append(slider_action)				
 
-				image_action = QtWidgets.QAction("Add Image..", None)
+				image_action = QAction("Add Image..", None)
 				image_action.triggered.connect(partial(self.add_image_item, event))
 				menu.addAction(image_action)
 				actions.append(image_action)				
 
 				menu.addSeparator()
 
-				background_action = QtWidgets.QAction("Set background image..", None)
+				background_action = QAction("Set background image..", None)
 				background_action.triggered.connect(self.set_background_event)
 				menu.addAction(background_action)
 
-				reset_background_action = QtWidgets.QAction("Reset background",
+				reset_background_action = QAction("Reset background",
                                                             None)
 				func = self.reset_background_event
 				reset_background_action.triggered.connect(func)
@@ -1244,7 +1256,7 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 
 				elif picker_item and picker_item.rmb_items:
 					for a_name in picker_item.rmb_items:
-						action = QtWidgets.QAction(a_name, None)
+						action = QAction(a_name, None)
 						action.triggered.connect(partial(self.run_rmb_command, picker_item, a_name))
 						menu.addAction(action)
 						actions.append(action)
@@ -2015,7 +2027,7 @@ class Polygon(DefaultPolygon):
 
 		elif self.shape_type == "rect" or self.shape_type == "slider_back":
 			if self.radius:
-				path.addRoundRect(QtCore.QRectF(self.width * -0.5, self.height * -0.5, self.width, self.height), self.radius)
+				path.addRoundedRect(QtCore.QRectF(self.width * -0.5, self.height * -0.5, self.width, self.height), self.radius, self.radius)
 			else:
 				path.addRect(QtCore.QRectF(self.width * -0.5, self.height * -0.5, self.width, self.height))
 
@@ -2237,9 +2249,9 @@ class PointHandle(DefaultPolygon):
 		DefaultPolygon.__init__(self, parent)
 
 		# Make movable
-		self.setFlag(self.ItemIsMovable)
-		self.setFlag(self.ItemSendsScenePositionChanges)
-		self.setFlag(self.ItemIgnoresTransformations)
+		self.setFlag(self.GraphicsItemFlag.ItemIsMovable)
+		self.setFlag(self.GraphicsItemFlag.ItemSendsScenePositionChanges)
+		self.setFlag(self.GraphicsItemFlag.ItemIgnoresTransformations)
 
 		# Set values
 		self.setPos(x, y)
@@ -2375,7 +2387,7 @@ class PointHandleIndex(QtWidgets.QGraphicsSimpleTextItem):
 		self.set_size()
 		self.set_color(PointHandleIndex.__DEFAULT_COLOR__)
 		self.setPos(QtCore.QPointF(-9, -14))
-		self.setFlag(self.ItemIgnoresTransformations)
+		self.setFlag(self.GraphicsItemFlag.ItemIgnoresTransformations)
 
 		# Hide by default
 		self.setVisible(False)
@@ -2448,8 +2460,8 @@ class PickerItem(DefaultPolygon):
 
 		# Make item movable
 		if edit or movableAlways:
-			self.setFlag(self.ItemIsMovable)
-			self.setFlag(self.ItemSendsScenePositionChanges)		
+			self.setFlag(self.GraphicsItemFlag.ItemIsMovable)
+			self.setFlag(self.GraphicsItemFlag.ItemSendsScenePositionChanges)		
 
 		self.rmb_items = []
 		self.rmb_scripts = []
@@ -2845,16 +2857,15 @@ class PickerItem(DefaultPolygon):
 		#self.mouseReleaseEvent(event)
 
 	def edit_context_menu(self, event):
-		return
 		# Init context menu
 		menu = QtWidgets.QMenu(self.parent())
 
 		# Build edit context menu
-		options_action = QtWidgets.QAction("Options", None)
+		options_action = QAction("Options", None)
 		options_action.triggered.connect(self.edit_options)
 		menu.addAction(options_action)
 
-		handles_action = QtWidgets.QAction("Toggle handles", None)
+		handles_action = QAction("Toggle handles", None)
 		handles_action.triggered.connect(self.toggle_edit_status)
 		menu.addAction(handles_action)
 
@@ -2864,43 +2875,43 @@ class PickerItem(DefaultPolygon):
 		shape_menu = QtWidgets.QMenu(menu)
 		shape_menu.setTitle("Shape")
 
-		move_action = QtWidgets.QAction("Move to center", None)
+		move_action = QAction("Move to center", None)
 		move_action.triggered.connect(self.move_to_center)
 		shape_menu.addAction(move_action)
 
-		shp_mirror_action = QtWidgets.QAction("Mirror shape", None)
+		shp_mirror_action = QAction("Mirror shape", None)
 		shp_mirror_action.triggered.connect(self.mirror_shape)
 		shape_menu.addAction(shp_mirror_action)
 
-		color_mirror_action = QtWidgets.QAction("Mirror color", None)
+		color_mirror_action = QAction("Mirror color", None)
 		color_mirror_action.triggered.connect(self.mirror_color)
 		shape_menu.addAction(color_mirror_action)
 
 		menu.addMenu(shape_menu)
 
-		move_back_action = QtWidgets.QAction("Move to back", None)
+		move_back_action = QAction("Move to back", None)
 		move_back_action.triggered.connect(self.move_to_back)
 		menu.addAction(move_back_action)
 
-		move_front_action = QtWidgets.QAction("Move to front", None)
+		move_front_action = QAction("Move to front", None)
 		move_front_action.triggered.connect(self.move_to_front)
 		menu.addAction(move_front_action)
 
 		menu.addSeparator()
 
 		# Copy handling
-		copy_action = QtWidgets.QAction("Copy", None)
+		copy_action = QAction("Copy", None)
 		copy_action.triggered.connect(self.copy_event)
 		menu.addAction(copy_action)
 
-		paste_action = QtWidgets.QAction("Paste", None)
+		paste_action = QAction("Paste", None)
 		if DataCopyDialog.__DATA__:
 			paste_action.triggered.connect(self.past_event)
 		else:
 			paste_action.setEnabled(False)
 		menu.addAction(paste_action)
 
-		paste_options_action = QtWidgets.QAction("Paste Options", None)
+		paste_options_action = QAction("Paste Options", None)
 		if DataCopyDialog.__DATA__:
 			paste_options_action.triggered.connect(self.past_option_event)
 		else:
@@ -2910,18 +2921,18 @@ class PickerItem(DefaultPolygon):
 		menu.addSeparator()
 
 		# Duplicate options
-		duplicate_action = QtWidgets.QAction("Duplicate", None)
+		duplicate_action = QAction("Duplicate", None)
 		duplicate_action.triggered.connect(self.duplicate)
 		menu.addAction(duplicate_action)
 
-		mirror_dup_action = QtWidgets.QAction("Duplicate/mirror", None)
+		mirror_dup_action = QAction("Duplicate/mirror", None)
 		#mirror_dup_action.triggered.connect(self.duplicate_and_mirror)
 		menu.addAction(mirror_dup_action)
 
 		menu.addSeparator()
 
 		# Delete
-		remove_action = QtWidgets.QAction("Remove", None)
+		remove_action = QAction("Remove", None)
 		remove_action.triggered.connect(self.remove)
 		menu.addAction(remove_action)
 
@@ -2931,11 +2942,11 @@ class PickerItem(DefaultPolygon):
 		ctrls_menu = QtWidgets.QMenu(menu)
 		ctrls_menu.setTitle("Ctrls Association")
 
-		select_action = QtWidgets.QAction("Select", None)
+		select_action = QAction("Select", None)
 		select_action.triggered.connect(self.select_associated_controls)
 		ctrls_menu.addAction(select_action)
 
-		#replace_action = QtWidgets.QAction("Replace with selection", None)
+		#replace_action = QAction("Replace with selection", None)
 		#replace_action.triggered.connect(self.replace_controls_selection)
 		#ctrls_menu.addAction(replace_action)
 
@@ -2954,7 +2965,7 @@ class PickerItem(DefaultPolygon):
 		menu = QtWidgets.QMenu(self.parent())
 
 		# Add reset action
-		# reset_action = QtWidgets.QAction("Reset", None)
+		# reset_action = QAction("Reset", None)
 		# reset_action.triggered.connect(self.active_control.reset_to_bind_pose)
 		# menu.addAction(reset_action)
 
@@ -3006,7 +3017,7 @@ class PickerItem(DefaultPolygon):
 
 		# Build menu
 		for i in range(len(custom_data)):
-			actions.append(QtWidgets.QAction(custom_data[i][0], None))
+			actions.append(QAction(custom_data[i][0], None))
 			actions[i].triggered.connect(wrapper(custom_data[i][1]))
 
 		return actions
@@ -3627,7 +3638,7 @@ class PickerItem(DefaultPolygon):
 	def set_visible(self, vis):
 		self.visible = vis
 		self.text.visible = vis
-		self.setFlag(self.ItemIsMovable, vis)
+		self.setFlag(self.GraphicsItemFlag.ItemIsMovable, vis)
 		self.setFlag(self.ItemSendsScenePositionChanges, vis)			
 
 	def get_data(self):
@@ -4121,13 +4132,14 @@ class MyDockingUI(QtWidgets.QWidget):
 
 
 			# Fingers Sliders
-			self.fingersSliders_menuBtn = QtWidgets.QAction(QtGui.QIcon("bug.png"), "Fingers Sliders", self)
+			self.fingersSliders_menuBtn = QAction(QtGui.QIcon("bug.png"), "Fingers Sliders", self)
 			self.fingersSliders_menuBtn.triggered.connect(self.fingersSliders_action)
 			self.fingersSliders_menuBtn.setCheckable(True)
 			file_menu.addAction(self.fingersSliders_menuBtn)
 
 			# Sym Mir Reset Buttons
-			msr_action = QtWidgets.QAction(QtGui.QIcon("bug.png"), "Mir Sym Reset Buttons", self)
+			msr_action = QAction(QtGui.QIcon("bug.png"), "Mir Sym Reset Buttons", self)
+			
 			#msr_action.setStatusTip("This is your button2")
 			msr_action.triggered.connect(self.useMirSymResetButtons_action)
 			msr_action.setCheckable(True)	
@@ -4135,24 +4147,27 @@ class MyDockingUI(QtWidgets.QWidget):
 			file_menu.addAction(msr_action)
 
 			# panels button
-			button_action = QtWidgets.QAction(QtGui.QIcon("bug.png"), "Collapsed", self)
+			button_action = QAction(QtGui.QIcon("bug.png"), "Collapsed", self)
 			button_action.setStatusTip("This is your button")
 			button_action.triggered.connect(partial(self.switch_panels, 1))
 			button_action.setCheckable(True)
 
-			button_action2 = QtWidgets.QAction(QtGui.QIcon("bug.png"), "Horizontal", self)
+			button_action2 = QAction(QtGui.QIcon("bug.png"), "Horizontal", self)
 			button_action2.setStatusTip("This is your button2")
 			button_action2.triggered.connect(partial(self.switch_panels, 2))
 			button_action2.setCheckable(True)
 
-			button_action3 = QtWidgets.QAction(QtGui.QIcon("bug.png"), "Vertical", self)
+			button_action3 = QAction(QtGui.QIcon("bug.png"), "Vertical", self)
 			button_action3.setStatusTip("This is your button2")
 			button_action3.triggered.connect(partial(self.switch_panels, 3))
 			button_action3.setCheckable(True)
 
 			file_submenu = file_menu.addMenu("Panels Placement")
 
-			alignmentGroup = QtWidgets.QActionGroup(self)
+			try:
+				alignmentGroup = QtWidgets.QActionGroup(self)
+			except:
+				alignmentGroup = QtGui.QActionGroup(self)
 			alignmentGroup.addAction(button_action)
 			alignmentGroup.addAction(button_action2)
 			alignmentGroup.addAction(button_action3)
@@ -4494,7 +4509,7 @@ class MyDockingUI(QtWidgets.QWidget):
 		#toolBar = QtWidgets.QToolBar()
 		#self.win.verticalLayout_76.addWidget(toolBar)
 
-		#action1 = QtWidgets.QAction("Add", toolBar)
+		#action1 = QAction("Add", toolBar)
 
 		#self.addLayer("Default")
 		
@@ -5188,8 +5203,8 @@ class MyDockingUI(QtWidgets.QWidget):
 							skip = False
 							if item_data["layer"] in self.get_external_layers():
 								orig_name = item_data["name"].split(item_data["layer"]+"_")[1]
-								if "face_head" == item_data["name"] :
-									print (444, orig_name)	
+								# if "face_head" == item_data["name"] :
+								# 	print (444, orig_name)	
 									#print (444, item_data["name"])									
 								for _item_data in t_data["items"]:
 									if _item_data["name"] == orig_name:
@@ -5222,7 +5237,7 @@ class MyDockingUI(QtWidgets.QWidget):
 						item.mirrored = item.name.split("_")[-1] == "MIRROR"
 
 						if item.layer in self.get_external_layers():
-							item.setFlag(item.ItemIsMovable, False)
+							item.setFlag(item.GraphicsItemFlag.ItemIsMovable, False)
 							item.setFlag(item.ItemSendsScenePositionChanges, False)	
 							item.setFlag(item.ItemIsSelectable, True)	
 
@@ -5461,7 +5476,7 @@ class MyDockingUI(QtWidgets.QWidget):
 						item.mirrored = item.name.split("_")[-1] == "MIRROR"
 
 						if item.layer in self.get_external_layers():
-							item.setFlag(item.ItemIsMovable, False)
+							item.setFlag(item.GraphicsItemFlag.ItemIsMovable, False)
 							item.setFlag(item.ItemSendsScenePositionChanges, False)	
 
 						if item.slider_item:

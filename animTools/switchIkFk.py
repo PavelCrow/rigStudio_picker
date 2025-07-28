@@ -46,16 +46,16 @@ def getInternalNameFromControl(controlName):
 		return ""
 
 def getControlNameFromInternal(module_name, internalControlName):
-	print ("---", module_name)
+	# print ("---", module_name)
 	ctrls = getSetObjects(module_name+'_moduleControlSet')
-	# print ("---", module_name, internalControlName, ctrls)
+	# print ("---GET NAME FROM INT", module_name, internalControlName)
 	for c in ctrls:
-		#print c
-		#if c == 'l_footB_heelFk':
-			#print c
+		# print(666, c)
 		try:
 			int_name = cmds.getAttr(c+".internalName")
+			# print(555, c, int_name)
 			if int_name == internalControlName:
+				# print(33, module_name, internalControlName, c)
 				return c
 		except: pass
 	#cmds.warning('Cannot find control with internal name '+internalControlName+' in moduleControlSet')
@@ -162,15 +162,16 @@ def switchIkFk(simple=False):
 	controls = []
 	for sel in sels:
 		ns = getNS(sel)
-		intName = getInternalNameFromControl(sel)
+		# intName = getInternalNameFromControl(sel)
 		m_name = ns + getModuleName(sel)
-
+		# print(333, m_name)
 		# get switch control
 		mod = m_name + "_mod"
 		if cmds.objExists(mod+".ikFk"):
 			control = getInputNode(mod, "ikFk")
 		else:
 			control = getControlNameFromInternal(m_name, "control")
+			# print(444, control)
 		
 		if control == "":
 			cmds.warning('Control with ikFk attribute is not found')
@@ -310,7 +311,7 @@ def from_fk_to_ik(control):
 	cmds.setAttr(control + ".ikFk", 1)
 
 def from_ik_to_fk(control):
-	print ("--- switch ik to fk ---22")
+	print ("--- switch ik to fk ---")
 	
 	# get variables
 	ns = getNS(control)
@@ -328,7 +329,7 @@ def from_ik_to_fk(control):
 		init_tEnd = cmds.getAttr(m_name + "_initScaleEnd_mult.input1")
 		cur_tEnd = cmds.getAttr(m_name + "_end_finalJoint.tx")
 		lEnd = cur_tEnd / init_tEnd
-		#print (m_name + "_initScaleEnd_mult.input1", init_tEnd, cur_tEnd)
+		# print (88, m_name + "_initScaleEnd_mult.input1", init_tEnd, cur_tEnd)
 		if lEnd < 0: lEnd *= -1
 		if quad:
 			init_tC = cmds.getAttr(m_name + "_initScale2_mult.input1")
@@ -389,10 +390,15 @@ def from_ik_to_fk(control):
 	if quad: 
 		snap( getControlNameFromInternal(m_name, "fk_c") )
 	if foot_m: 
+		# print(44, getControlNameFromInternal(foot_m, "fk_heel"))
 		snap(getControlNameFromInternal(foot_m, "fk_heel") )
 		snap(getControlNameFromInternal(foot_m, "fk_toe") )
 	else:
 		snap( getControlNameFromInternal(m_name, "fk_end") )
+	
+	if cmds.objExists(ns+"main.skipLegLength"): # vdrugs fix
+		cmds.setAttr(control + ".ikFk", 0)
+		return
 	
 	cmds.setAttr(control + ".length1", l1)
 	if quad: 
@@ -404,6 +410,9 @@ def from_ik_to_fk(control):
 	cmds.setAttr(control + ".ikFk", 0)
 
 def snap(target, rev=True):
+	if not target:
+		print("Missed target - "+target)
+		return
 	# get helper
 	ns = getNS(target)
 	m_name = ns + getModuleName(target)
