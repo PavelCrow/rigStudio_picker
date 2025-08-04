@@ -2,9 +2,22 @@
 from maya import OpenMayaUI, OpenMaya
 import maya.mel as mel
 import maya.cmds as cmds
-from PySide2 import QtWidgets, QtGui, QtCore
-import shiboken2, os, imp, sys, importlib
+import os, imp, sys, importlib
 from functools import partial
+
+try:
+	from PySide2 import QtWidgets, QtGui
+except:
+	try:
+		from PySide6 import QtWidgets
+	except:
+		from Qt import QtWidgets
+try: 
+	try:
+		from shiboken6 import wrapInstance
+	except:
+		from shiboken2 import wrapInstance
+except: from shiboken import wrapInstance
 
 root_path = os.path.dirname(os.path.abspath(__file__))
 mod_name = root_path.split('\\')[-1]
@@ -20,9 +33,9 @@ def convertPathToPySideObject(name):
 		ptr = OpenMayaUI.MQtUtil.findMenuItem(name)
 	if ptr is not None:     
 		try:
-			return shiboken2.wrapInstance(long(ptr), QtWidgets.QWidget)
+			return wrapInstance(long(ptr), QtWidgets.QWidget)
 		except:
-			return shiboken2.wrapInstance(int(ptr), QtWidgets.QWidget)
+			return wrapInstance(int(ptr), QtWidgets.QWidget)
 
 def togglePkr(v):
 	with open(root_path+'/picker/config.json', mode='r') as f:
