@@ -634,7 +634,7 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 			if event.button() == QtCore.Qt.RightButton:	
 				self.zoom_active = True
 				self.zoom_pos = event.pos().x()
-				self.init_zoom = self.matrix().m11()
+				self.init_zoom = self.transform().m11()
 
 		self.scene_mouse_origin = self.mapToScene(event.pos())
 
@@ -675,7 +675,7 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 				target_scale = 0.5
 			#elif target_scale > 5:
 				#target_scale = 5
-			scale_current = self.matrix().m11()
+			scale_current = self.transform().m11()
 			factor = target_scale / scale_current
 			#factor = 1.01
 			#print (1111, factor)
@@ -986,7 +986,7 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 				cmds.optionVar( floatValue = ( "rsPicker_viewPosY_%s" %self.tab_name, self.centerValueY ) )
 			if (self.zoom_active and event.button() == QtCore.Qt.RightButton):
 				self.zoom_active = False
-				self.sizeValue = self.matrix().m11()
+				self.sizeValue = self.transform().m11()
 				cmds.optionVar( floatValue = ( "rsPicker_viewSize_%s" %self.tab_name, self.sizeValue ) )	
 
 		elif (event.button() == QtCore.Qt.RightButton):
@@ -1072,11 +1072,11 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 		#modifiers = event.modifiers()
 
 		#if modifiers == QtCore.Qt.ControlModifier:
-		scale_current = self.matrix().m11()
+		# scale_current = self.matrix().m11()
 		# Define zoom up factor
 		factor = 1.1
 		#print event.delta()
-		if event.delta() < 0:
+		if event.angleDelta().y() < 0:
 			factor = 0.9
 
 			## disable zoom below 1.0.  1.2 for bug fixing
@@ -1129,7 +1129,7 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 	def contextMenuEvent(self, event):
 		# Right click menu options
 
-		print ("MENU")
+		# print ("MENU")
 		if self.item_menu:
 			return
 
@@ -5024,8 +5024,9 @@ class MyDockingUI(QtWidgets.QWidget):
 			s = cmds.optionVar( q='rsPicker_viewSize_%s' %view.tab_name)
 			
 			if s:
-				m = QtGui.QMatrix(s, 0.000000, 0.000000, s, 0.000000, 0.000000)
-				view.setMatrix(m)
+				m = QtGui.QTransform(s, 0.000000, 0.000000, s, 0.000000, 0.000000)
+				# m = QtGui.QMatrix(2, 0, 0, 2, 10, 20)
+				view.setTransform(m)
 			x = cmds.optionVar( q='rsPicker_viewPosX_%s' %view.tab_name)
 			y = cmds.optionVar( q='rsPicker_viewPosY_%s' %view.tab_name)
 			view.centerOn(x,y)			
@@ -6716,7 +6717,7 @@ class MyDockingUI(QtWidgets.QWidget):
 			f.write(json_string)			
 
 	def zoomReset(self):
-		self.view.setMatrix(QtGui.QMatrix(1,0,0,1,0,0))
+		self.view.setTransform(QtGui.QTransform())
 		cmds.optionVar( floatValue = ( "rsPicker_viewSize_%s" %self.view.tab_name, 1 ) )
 		cmds.optionVar( floatValue = ( "rsPicker_viewPosX_%s" %self.view.tab_name, 0 ) )
 		cmds.optionVar( floatValue = ( "rsPicker_viewPosY_%s" %self.view.tab_name, 0 ) )
