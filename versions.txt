@@ -88,3 +88,6 @@ Added mirror tool button
 
 --- Version 1.0.0 ---
 Maya 2025 support
+
+--- Version 1.0.1 ---
+reset button fix

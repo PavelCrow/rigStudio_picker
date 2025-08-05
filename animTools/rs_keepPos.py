@@ -28,6 +28,9 @@ def getVisibleAttrs(ctrl):
 	
 	out_list = []
 	for a in attrList:
+		if a.split("_")[0] == "default":
+			continue
+
 		if a not in ["translate", "rotate", "scale"]:
 			out_list.append(a)
 	
