@@ -32,16 +32,19 @@ try:
 	from PySide2 import QtWidgets, QtGui, QtCore, QtUiTools
 	import PySide2.QtWidgets as QtWidgets
 	QAction = QtWidgets.QAction
+	rmb = QtCore.Qt.MidButton
 except:
 	try:
 		from PySide6 import QtWidgets, QtGui, QtCore, QtUiTools
 		from shiboken6 import wrapInstance
 		import PySide6.QtGui as QtGui
 		QAction = QtGui.QAction
+		rmb = QtCore.Qt.MiddleButton
 	except:
 		from Qt import QtWidgets, QtGui, QtCore, QtUiTools
 		import Qt.QtWidgets as QtWidgets
 		QAction = QtWidgets.QAction
+		rmb = QtCore.Qt.MidButton
 try: 
 	try:
 		from shiboken6 import wrapInstance
@@ -629,7 +632,7 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 
 		modifiers = event.modifiers()
 		if modifiers == QtCore.Qt.AltModifier:		
-			if event.button() == QtCore.Qt.MidButton:
+			if event.button() == rmb:
 				self.pan_active = True
 			if event.button() == QtCore.Qt.RightButton:	
 				self.zoom_active = True
@@ -971,7 +974,7 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 		# Middle mouse view panning
 		modifiers = event.modifiers()
 		if modifiers == QtCore.Qt.AltModifier:
-			if (self.pan_active and event.button() == QtCore.Qt.MidButton):
+			if (self.pan_active and event.button() == rmb):
 				current_center = self.get_center_pos()
 				scene_drag_end = self.mapToScene(event.pos())
 
@@ -6888,6 +6891,7 @@ def run(edit=False, rigFromJoints=None):
 		except:
 			pass
 		picker_win = MyDockingUI(getMayaWindow())  
+		print("Edit Mode", picker_win)
 	else:
 		picker_win = dock_window(MyDockingUI, edit, rigFromJoints)
 

@@ -164,14 +164,14 @@ def switchIkFk(simple=False):
 		ns = getNS(sel)
 		# intName = getInternalNameFromControl(sel)
 		m_name = ns + getModuleName(sel)
-		# print(333, m_name)
+		print(333, m_name)
 		# get switch control
 		mod = m_name + "_mod"
 		if cmds.objExists(mod+".ikFk"):
 			control = getInputNode(mod, "ikFk")
 		else:
 			control = getControlNameFromInternal(m_name, "control")
-			# print(444, control)
+			print(444, control)
 		
 		if control == "":
 			cmds.warning('Control with ikFk attribute is not found')

@@ -91,3 +91,6 @@ Maya 2025 support
 
 --- Version 1.0.1 ---
 reset button fix
+
+--- Version 1.0.2 ---
+Panning Maya 2025 fix
