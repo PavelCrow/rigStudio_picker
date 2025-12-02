@@ -109,7 +109,6 @@ def oneStepUndo(func):
 	return wrapper	
 
 edit = True
-rigFromJoints = False
 save_geometry = False
 
 def debug_function(func):
@@ -933,8 +932,7 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 				if item:
 
 					if not edit and not item.controls:
-						if self.main.match_rig:
-							self.selected_items = [item]
+						pass
 					elif item in self.selected_items:
 						# select item on single click only
 						if event.modifiers() or self.drag_start:
@@ -1983,7 +1981,6 @@ class Polygon(DefaultPolygon):
 		self.flipped = False
 		self.select_color = QtGui.QColor(1, 1, 0, 1)
 		self.par = self.parent()
-		self.mr = self.par.main.match_rig
 
 	def set_edit_status(self, status=False):
 		self._edit_status = status
@@ -2063,9 +2060,6 @@ class Polygon(DefaultPolygon):
 
 	def controlIsVisible(self):
 		for c in self.par.get_controls():
-			# for match rig skip
-			if self.mr and cmds.objExists(c) and cmds.objectType(c) == 'joint':
-				return True
 			if self.shapeIsVisible(c):
 				return True
 		return False
@@ -2099,13 +2093,12 @@ class Polygon(DefaultPolygon):
 			#self.controlIsVisible()
 
 		# disable selecting if controls is hidden
-		if not self.par.main.match_rig:
-			if not edit or (edit and not self.par.main.showHidden):
-				if self.par.controls:
-					if not self.controlIsVisible():
-						self.parent().setZValue(-1)
-						self.par.text.visible=False
-						return
+		if not edit or (edit and not self.par.main.showHidden):
+			if self.par.controls:
+				if not self.controlIsVisible():
+					self.parent().setZValue(-1)
+					self.par.text.visible=False
+					return
 
 		#print "PAINT", self.parent().name#, self.selected
 		painter.setRenderHint(QtGui.QPainter.Antialiasing)
@@ -3334,14 +3327,6 @@ class PickerItem(DefaultPolygon):
 	def set_selected_controls(self):
 		sel = cmds.ls(sl=1)
 
-		if self.main.match_rig:
-			if len(sel) == 0:
-				self.polygon.set_grey_render_image(True)
-				self.set_grey_color()
-			else:
-				self.polygon.set_grey_render_image(False)
-				self.set_orange_color()
-
 		self.controls = []
 		for c in sel:
 			self.controls.append(c.split("|")[-1])
@@ -3852,10 +3837,9 @@ def getMayaWindow():
 			return wrapInstance(int(ptr), QtWidgets.QWidget)	
 
 
-def dock_window(dialog_class, edit_mode, rigFromJoints_tool):
-	global edit, rigFromJoints
+def dock_window(dialog_class, edit_mode):
+	global edit
 	edit = edit_mode
-	rigFromJoints = rigFromJoints_tool
 
 	try:
 		cmds.deleteUI(dialog_class.CONTROL_NAME)
@@ -4054,7 +4038,7 @@ class MyDockingUI(QtWidgets.QWidget):
 		debugEnd(traceback.extract_stack()[-1][2])	
 		return self		
 
-	def __init_2(self, _edit=False, picker_name=None, match_rig=False, match_scene=False):
+	def __init_2(self, _edit=False, picker_name=None):
 		debugStart(traceback.extract_stack()[-1][2])
 
 		self.uiFilePath = root_path+'//pickerWindow.ui'
@@ -4066,19 +4050,12 @@ class MyDockingUI(QtWidgets.QWidget):
 		#global edit
 		#edit = _edit
 		self.edit = edit
-		self.rigFromJoints = rigFromJoints
 		self.picker_name = None
 		self.pickers = {}
 		self.tab_widgets = {}
 		self.cur_picker = None
-		self.match_rig = match_rig
-		self.match_scene = match_scene
 		self.slider_scriptJobs = []
 		self.picker_nodes = []
-
-		if self.rigFromJoints:
-			self.picker_name = 'mr'
-			self.match_rig = True
 
 		# Window size
 		#self.default_width = 800
@@ -5060,7 +5037,6 @@ class MyDockingUI(QtWidgets.QWidget):
 		#print ("LOAD PICKER")
 		if not picker:
 			return
-
 		name = picker.name
 		self.cur_picker = picker
 		tab_widget = self.tab_widgets[name]
@@ -5172,14 +5148,16 @@ class MyDockingUI(QtWidgets.QWidget):
 			#progressControl = cmds.progressBar(maxValue=len(count)-1, minValue=0, width=300)
 			#cmds.showWindow( window )
 
+		print(111,  self.get_external_layers())
+
 		tabs_vis = []
 		names = []
 		# set tabs data
 		for i, t_data in enumerate(tabs_data):
 			t_name = t_data["name"]
-
+			
 			view = tab_widget.getViewByName(t_name)
-
+			
 			if t_data["background"] != None:
 				view.index = i
 				view.background_opacity = t_data["background_opacity"]
@@ -5205,6 +5183,7 @@ class MyDockingUI(QtWidgets.QWidget):
 							#print (444, item_data["name"])							
 						if not self.edit:
 							skip = False
+							
 							if item_data["layer"] in self.get_external_layers():
 								orig_name = item_data["name"].split(item_data["layer"]+"_")[1]
 								# if "face_head" == item_data["name"] :
@@ -5217,7 +5196,7 @@ class MyDockingUI(QtWidgets.QWidget):
 							if skip:
 								continue
 						item = view.add_picker_item(setData=False)
-
+						
 						item_data_name = item_data["name"]
 
 						if item_data["layer"] not in layer_names:
@@ -5662,7 +5641,7 @@ class MyDockingUI(QtWidgets.QWidget):
 		w = self.parent().parent().parent().parent().parent().geometry().width()
 		h = self.parent().parent().parent().parent().parent().geometry().height()		
 
-		picker_win = dock_window(MyDockingUI, edit, rigFromJoints)
+		picker_win = dock_window(MyDockingUI, edit)
 
 		# restore geometry
 		picker_win.parent().parent().parent().parent().parent().adjustSize()
@@ -6822,7 +6801,7 @@ class MyDockingUI(QtWidgets.QWidget):
 
 		self.mirrorWin.show()
 
-def run_dockable_old(edit=False, picker_name=None, match_rig=False, match_scene=False):
+def run_dockable_old(edit=False, picker_name=None):
 	from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 	global picker_win
 
@@ -6830,8 +6809,8 @@ def run_dockable_old(edit=False, picker_name=None, match_rig=False, match_scene=
 		picker_win = None	
 
 	class DockableWidget(MayaQWidgetDockableMixin, Main):
-		def __init__(self, parent=None, edit=True, picker_name=None, match_rig=False, match_scene=False):
-			super(DockableWidget, self).__init__(parent=parent, _edit=edit, picker_name=picker_name, match_rig=match_rig, match_scene=match_scene)
+		def __init__(self, parent=None, edit=True, picker_name=None):
+			super(DockableWidget, self).__init__(parent=parent, _edit=edit, picker_name=picker_name)
 			self.setObjectName('picker_win')
 
 			#self.setSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Maximum )
@@ -6852,7 +6831,7 @@ def run_dockable_old(edit=False, picker_name=None, match_rig=False, match_scene=
 	#picker_win = MainWindow(_edit=edit)  
 	#picker_win.show()
 
-	picker_win = DockableWidget(edit=edit, picker_name=picker_name, match_rig=match_rig, match_scene=match_scene)  
+	picker_win = DockableWidget(edit=edit, picker_name=picker_name)  
 	picker_win.show(dockable=True)
 
 def run_old(edit=False):
@@ -6877,7 +6856,7 @@ def run_old(edit=False):
 
 	picker_win.show()
 
-def run(edit=False, rigFromJoints=None):
+def run(edit=False):
 	global picker_win
 
 	try:
@@ -6891,9 +6870,8 @@ def run(edit=False, rigFromJoints=None):
 		except:
 			pass
 		picker_win = MyDockingUI(getMayaWindow())  
-		print("Edit Mode", picker_win)
 	else:
-		picker_win = dock_window(MyDockingUI, edit, rigFromJoints)
+		picker_win = dock_window(MyDockingUI, edit)
 
 	return
 	# restore geometry

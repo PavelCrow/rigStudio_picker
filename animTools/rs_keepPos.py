@@ -83,12 +83,14 @@ def loadPos():
 					value = float(value)
 				
 				# If not locked, set value
-				if not cmds.getAttr(ctrl+"."+attr, lock=1):
+				try:
 					cmds.setAttr( ctrl+'.'+attr, value )
+				except: pass	
 			else:
-				value = cmds.attributeQuery(attr, node=ctrl, listDefault=True)[0]
-				if not cmds.getAttr(ctrl+"."+attr, lock=1):
+				try:
+					value = cmds.attributeQuery(attr, node=ctrl, listDefault=True)[0]
 					cmds.setAttr( ctrl+'.'+attr, value )
+				except: pass
 
 		
 		

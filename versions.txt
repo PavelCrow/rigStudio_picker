@@ -94,3 +94,6 @@ reset button fix
 
 --- Version 1.0.2 ---
 Panning Maya 2025 fix
+
+--- Version 1.0.3 ---
+Reset control script update
