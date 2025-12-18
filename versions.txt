@@ -97,3 +97,7 @@ Panning Maya 2025 fix
 
 --- Version 1.0.3 ---
 Reset control script update
+
+--- Version 1.0.4 ---
+Returned old back image
+Returned old stile radius polygons

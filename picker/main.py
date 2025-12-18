@@ -2027,7 +2027,7 @@ class Polygon(DefaultPolygon):
 
 		elif self.shape_type == "rect" or self.shape_type == "slider_back":
 			if self.radius:
-				path.addRoundedRect(QtCore.QRectF(self.width * -0.5, self.height * -0.5, self.width, self.height), self.radius, self.radius)
+				path.addRoundedRect(QtCore.QRectF(self.width * -0.5, self.height * -0.5, self.width, self.height), self.radius*0.2, self.radius*0.2)
 			else:
 				path.addRect(QtCore.QRectF(self.width * -0.5, self.height * -0.5, self.width, self.height))
 
