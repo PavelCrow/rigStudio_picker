@@ -101,3 +101,6 @@ Reset control script update
 --- Version 1.0.4 ---
 Returned old back image
 Returned old stile radius polygons
+
+--- Version 1.0.5 ---
+updated switch IkFk script for transformed fk controls
