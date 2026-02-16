@@ -149,6 +149,14 @@ def getConnectedFootModule(control):
 	
 	return False
 
+def objectType(node):
+	type = cmds.objectType(node)
+	
+	version = int(cmds.about(v=True).split(" ")[0])
+	if version >= 2026:
+		if type == "multDL": type = "multDoubleLinear"
+
+	return type
 
 ##################################
 # Switch IKFK
@@ -197,7 +205,7 @@ def switchIkFk(simple=False):
 	if sels:
 		cmds.select(sels)
 
-def get_lengths(control):
+def get_lengths(control, m_name):
 
 	quad = cmds.objExists(control+".length3")
 	lengths = []
@@ -205,7 +213,7 @@ def get_lengths(control):
 	def get_element_scale(part):
 		out_nodes = getOutputNodes(control, f"length{part}")
 		for node in out_nodes:
-			if cmds.objectType(node) == "multDoubleLinear":
+			if objectType(node) == "multDoubleLinear":
 				scale = cmds.getAttr(node + ".input1")
 				return scale
 
@@ -346,9 +354,9 @@ def from_fk_to_ik(control):
 	quad = cmds.objExists(control+".length3")
 
 	if quad:
-		length_1, length_2, length_3 = get_lengths(control)
+		length_1, length_2, length_3 = get_lengths(control, m_name)
 	else:
-		length_1, length_2 = get_lengths(control)
+		length_1, length_2 = get_lengths(control, m_name)
 
 	if cmds.objExists(m_name + "_a_finalJoint"):
 		joint_1 = m_name + '_a_finalJoint'
@@ -425,9 +433,9 @@ def from_ik_to_fk(control):
 
 	if cmds.objExists(m_name + "_b_finalJoint"):
 		if quad:
-			length_1, length_2, length_3 = get_lengths(control)
+			length_1, length_2, length_3 = get_lengths(control, m_name)
 		else:
-			length_1, length_2 = get_lengths(control)
+			length_1, length_2 = get_lengths(control, m_name)
 	else:
 		############### УСТАРЕВШИЙ КОД, для поддержки старых ригов ###############
 		import pymel.core.datatypes as dt
@@ -436,7 +444,7 @@ def from_ik_to_fk(control):
 		def get_element_scale(part):
 			out_nodes = getOutputNodes(control, f"length{part}")
 			for node in out_nodes:
-				if cmds.objectType(node) == "multDoubleLinear":
+				if objectType(node) == "multDoubleLinear":
 					scale = cmds.getAttr(node + ".input1")
 					return scale
 		

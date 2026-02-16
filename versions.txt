@@ -104,3 +104,6 @@ Returned old stile radius polygons
 
 --- Version 1.0.5 ---
 updated switch IkFk script for transformed fk controls
+
+--- Version 1.0.6 ---
+updated switch IkFk script
