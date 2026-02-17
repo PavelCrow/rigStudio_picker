@@ -6,7 +6,7 @@
 # rs_switchIkFk.switchIkFk()
 #
 # Pavel Korolyov
-# pavel.crow@gmail.com
+# pavel.crow@gmail.com 
 
 import maya.cmds as cmds
 import maya.OpenMaya as om
