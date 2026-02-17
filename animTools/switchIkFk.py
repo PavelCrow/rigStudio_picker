@@ -6,7 +6,7 @@
 # rs_switchIkFk.switchIkFk()
 #
 # Pavel Korolyov
-# pavel.crow@gmail.com 
+# pavel.crow@gmail.com
 
 import maya.cmds as cmds
 import maya.OpenMaya as om
@@ -37,7 +37,6 @@ def getModuleName(obj): #
 	
 	# moduleName = path[0].split("modules|")[-1].split("_mod|")[0].split("_mod")[0]
 	moduleName = path[0].split("modules|")[-1].split("_mod|")[0].split("_mod")[0].split(":")[-1]
-	# print(222, path, moduleName)
 	return moduleName
 
 def getInternalNameFromControl(controlName):
@@ -49,14 +48,14 @@ def getInternalNameFromControl(controlName):
 def getControlNameFromInternal(module_name, internalControlName):
 	# print ("---", module_name)
 	ctrls = getSetObjects(module_name+'_moduleControlSet')
-	# print ("---", module_name, internalControlName, ctrls)
+	# print ("---GET NAME FROM INT", module_name, internalControlName)
 	for c in ctrls:
-		#print c
-		#if c == 'l_footB_heelFk':
-			#print c
+		# print(666, c)
 		try:
 			int_name = cmds.getAttr(c+".internalName")
+			# print(555, c, int_name)
 			if int_name == internalControlName:
+				# print(33, module_name, internalControlName, c)
 				return c
 		except: pass
 	#cmds.warning('Cannot find control with internal name '+internalControlName+' in moduleControlSet')
@@ -112,17 +111,9 @@ def getInputNode(obj, attr):
 	if cmds.connectionInfo( obj+"."+attr, isDestination=True):
 		inputAttr = cmds.connectionInfo( obj+"."+attr, sourceFromDestination=True)	
 		inputNode = inputAttr.split('.')[0]
-		return inputNode
-	return None
 
-def getOutputNodes(obj, attr):
-	"""Возвращает узел, подключенный К атрибуту obj.attr (destination)"""
-	if cmds.connectionInfo(obj+"."+attr, isSource=True):
-		outputAttrs = cmds.connectionInfo(obj+"."+attr, destinationFromSource=True)
-		outputNodes = []
-		for a in outputAttrs:
-			outputNodes.append(a.split('.')[0])
-		return outputNodes
+		return inputNode
+
 	return None
 
 def getParent(module_name):
@@ -149,14 +140,14 @@ def getConnectedFootModule(control):
 	
 	return False
 
-def objectType(node):
-	type = cmds.objectType(node)
-	
-	version = int(cmds.about(v=True).split(" ")[0])
-	if version >= 2026:
-		if type == "multDL": type = "multDoubleLinear"
 
-	return type
+def oneStepUndo(func):
+	def wrapper(*args, **kwargs):
+		cmds.undoInfo(openChunk=True)
+		func(*args, **kwargs)
+		cmds.undoInfo(closeChunk=True)
+	return wrapper	
+
 
 ##################################
 # Switch IKFK
@@ -171,16 +162,16 @@ def switchIkFk(simple=False):
 	controls = []
 	for sel in sels:
 		ns = getNS(sel)
-		intName = getInternalNameFromControl(sel)
+		# intName = getInternalNameFromControl(sel)
 		m_name = ns + getModuleName(sel)
-		# print (11111, sel, m_name)
-
+		print(333, m_name)
 		# get switch control
 		mod = m_name + "_mod"
 		if cmds.objExists(mod+".ikFk"):
 			control = getInputNode(mod, "ikFk")
 		else:
 			control = getControlNameFromInternal(m_name, "control")
+			print(444, control)
 		
 		if control == "":
 			cmds.warning('Control with ikFk attribute is not found')
@@ -204,98 +195,6 @@ def switchIkFk(simple=False):
 
 	if sels:
 		cmds.select(sels)
-
-def get_lengths(control, m_name):
-
-	quad = cmds.objExists(control+".length3")
-	lengths = []
-
-	def get_element_scale(part):
-		out_nodes = getOutputNodes(control, f"length{part}")
-		for node in out_nodes:
-			if objectType(node) == "multDoubleLinear":
-				scale = cmds.getAttr(node + ".input1")
-				return scale
-
-	init_scale1 = get_element_scale(part=1)
-	
-	def get_local_length(j):
-		vector = cmds.getAttr(j+".t")[0]
-		x,y,z = vector
-		length = math.sqrt(x**2 + y**2 + z**2)
-		return length
-
-	if cmds.objExists(m_name + "_b_finalJoint"):
-		local_length_1 = get_local_length(m_name + "_b_finalJoint")
-		length_1 = local_length_1 / init_scale1
-		if length_1 < 0: length_1 *= -1
-		
-		init_scale2 = get_element_scale(part=2)
-		if quad:
-			local_length_2 = get_local_length(m_name + "_c_finalJoint")
-		else:
-			local_length_2 = get_local_length(m_name + "_end_finalJoint")
-		length_2 = local_length_2 / init_scale2
-		if length_2 < 0: length_2 *= -1
-
-		lengths = [length_1, length_2]
-
-		if quad:
-			local_length_3 = get_element_scale(part=3)
-			cur_scale3 = get_local_length(m_name + "_end_finalJoint")
-			length_3 = cur_scale3 / local_length_3	
-			if length_3 < 0: length_3 *= -1
-			lengths.append(length_3)
-	else:
-		############### УСТАРЕВШИЙ КОД, для поддержки старых ригов ###############
-		import pymel.core.datatypes as dt
-		import pymel.core as pm
-		p0 = pm.xform(m_name+'_root_outJoint', ws=1, q=1, t=1)        
-		p1 = pm.xform(m_name+'_knee_outJoint', ws=1, q=1, t=1)
-		v0 = dt.Vector(p0)
-		v1 = dt.Vector(p1)
-		v = v1 - v0
-		l = v.length()
-		scl = cmds.getAttr(m_name+"_root_connector_decomposeMatrix.outputScaleX")
-		scl_converted = l/scl
-		length_1 = scl_converted/init_scale1
-		
-		if not quad:
-			p0 = pm.xform(m_name+'_b_finalJoint', ws=1, q=1, t=1)        
-			p1 = pm.xform(m_name+'_end_outJoint', ws=1, q=1, t=1)
-			v0 = dt.Vector(p0)
-			v1 = dt.Vector(p1)
-			v = v1 - v0
-			l = v.length()
-			scl_converted = l/scl
-			init_scale2 = cmds.getAttr(m_name + "_initScaleEnd_mult.input1")
-			length_3 = scl_converted/init_scale2
-			print (444, length_1, length_3)
-			
-		else:
-			p0 = pm.xform(m_name+'_knee_outJoint', ws=1, q=1, t=1)        
-			p1 = pm.xform(m_name+'_ankle_outJoint', ws=1, q=1, t=1)
-			v0 = dt.Vector(p0)
-			v1 = dt.Vector(p1)
-			v = v1 - v0
-			l = v.length()
-			scl_converted = l/scl
-			init_scale2 = cmds.getAttr(m_name + "_initScale2_mult.input1")
-			length_3 = scl_converted/init_scale2
-
-			p0 = pm.xform(m_name+'_ankle_outJoint', ws=1, q=1, t=1)        
-			p1 = pm.xform(m_name+'_end_outJoint', ws=1, q=1, t=1)
-			v0 = dt.Vector(p0)
-			v1 = dt.Vector(p1)
-			v = v1 - v0
-			l = v.length()
-			scl_converted = l/scl
-			init_scale2 = cmds.getAttr(m_name + "_initScaleEnd_mult.input1")
-			length_2 = scl_converted/init_scale2
-			print (44444, length_1, length_3, length_2 )
-		##########################################################################
-	
-	return lengths
 
 def from_fk_to_ik(control):
 	print ("--- switch fk to ik ---")
@@ -337,6 +236,9 @@ def from_fk_to_ik(control):
 
 		# Make vector as needed length and from b point and final Point elbow control
 		if cmds.objExists(m_name+'_mod.aim_offset'):
+			if not cmds.objExists(m_name+'_mainPoser_decomposeMatrix'):
+				cmds.createNode('decomposeMatrix', n=m_name+'_mainPoser_decomposeMatrix')
+				cmds.connectAttr(m_name+'_mainPoser.worldMatrix[0]', m_name+'_mainPoser_decomposeMatrix.inputMatrix')
 			scale = cmds.getAttr(m_name+'_mainPoser_decomposeMatrix.outputScaleX')
 			offset = cmds.getAttr(m_name+'_mod.aim_offset') * scale 
 		else:
@@ -352,11 +254,6 @@ def from_fk_to_ik(control):
 	
 	m_name = ns + getModuleName(control)
 	quad = cmds.objExists(control+".length3")
-
-	if quad:
-		length_1, length_2, length_3 = get_lengths(control, m_name)
-	else:
-		length_1, length_2 = get_lengths(control, m_name)
 
 	if cmds.objExists(m_name + "_a_finalJoint"):
 		joint_1 = m_name + '_a_finalJoint'
@@ -412,45 +309,36 @@ def from_fk_to_ik(control):
 		snapIkElbow(joint_1, joint_2, joint_last, aim_ctrl)
 
 	cmds.setAttr(control + ".ikFk", 1)
-	
-	cmds.setAttr(control + ".length1", length_1)
-	if quad: 
-		cmds.setAttr(control + ".length2", length_2)
-		cmds.setAttr(control + ".length3", length_3)
-	else:
-		cmds.setAttr(control + ".length2", length_2)
-
-	
 
 def from_ik_to_fk(control):
-	print ("--- switch ik to fk ---22")
+	print ("--- switch ik to fk ---")
 	
 	# get variables
 	ns = getNS(control)
 	m_name = ns + getModuleName(control)
 	foot_m = getConnectedFootModule(control)
-	quad = cmds.objExists(control+".length3")
 
+	quad = cmds.objExists(control+".length3")
+	#print 00, control, control+".lehgth3", cmds.objExists(control+".lehgth3")
+	# get init scale values
+	init_tB = cmds.getAttr(m_name + "_initScale1_mult.input1")
 	if cmds.objExists(m_name + "_b_finalJoint"):
+		cur_tB = cmds.getAttr(m_name + "_b_finalJoint.tx")
+		l1 = cur_tB / init_tB
+		if l1 < 0: l1 *= -1
+		init_tEnd = cmds.getAttr(m_name + "_initScaleEnd_mult.input1")
+		cur_tEnd = cmds.getAttr(m_name + "_end_finalJoint.tx")
+		lEnd = cur_tEnd / init_tEnd
+		# print (88, m_name + "_initScaleEnd_mult.input1", init_tEnd, cur_tEnd)
+		if lEnd < 0: lEnd *= -1
 		if quad:
-			length_1, length_2, length_3 = get_lengths(control, m_name)
-		else:
-			length_1, length_2 = get_lengths(control, m_name)
+			init_tC = cmds.getAttr(m_name + "_initScale2_mult.input1")
+			cur_tC = cmds.getAttr(m_name + "_c_finalJoint.tx")
+			l2 = cur_tC / init_tC	
+			if l2 < 0: l2 *= -1
 	else:
-		############### УСТАРЕВШИЙ КОД, для поддержки старых ригов ###############
 		import pymel.core.datatypes as dt
 		import pymel.core as pm
-
-		def get_element_scale(part):
-			out_nodes = getOutputNodes(control, f"length{part}")
-			for node in out_nodes:
-				if objectType(node) == "multDoubleLinear":
-					scale = cmds.getAttr(node + ".input1")
-					return scale
-		
-
-		init_scale1 = get_element_scale(part=1)
-				
 		p0 = pm.xform(m_name+'_root_outJoint', ws=1, q=1, t=1)        
 		p1 = pm.xform(m_name+'_knee_outJoint', ws=1, q=1, t=1)
 		v0 = dt.Vector(p0)
@@ -459,7 +347,7 @@ def from_ik_to_fk(control):
 		l = v.length()
 		scl = cmds.getAttr(m_name+"_root_connector_decomposeMatrix.outputScaleX")
 		scl_converted = l/scl
-		length_1 = scl_converted/init_scale1
+		l1 = scl_converted/init_tB
 		
 		if not quad:
 			p0 = pm.xform(m_name+'_b_finalJoint', ws=1, q=1, t=1)        
@@ -469,9 +357,9 @@ def from_ik_to_fk(control):
 			v = v1 - v0
 			l = v.length()
 			scl_converted = l/scl
-			init_scale2 = cmds.getAttr(m_name + "_initScaleEnd_mult.input1")
-			length_3 = scl_converted/init_scale2
-			print (444, length_1, length_3)
+			init_tEnd = cmds.getAttr(m_name + "_initScaleEnd_mult.input1")
+			l2 = scl_converted/init_tEnd
+			print (444, l1, l2)
 			
 		else:
 			p0 = pm.xform(m_name+'_knee_outJoint', ws=1, q=1, t=1)        
@@ -481,8 +369,8 @@ def from_ik_to_fk(control):
 			v = v1 - v0
 			l = v.length()
 			scl_converted = l/scl
-			init_scale2 = cmds.getAttr(m_name + "_initScale2_mult.input1")
-			length_3 = scl_converted/init_scale2
+			init_tEnd = cmds.getAttr(m_name + "_initScale2_mult.input1")
+			l2 = scl_converted/init_tEnd
 
 			p0 = pm.xform(m_name+'_ankle_outJoint', ws=1, q=1, t=1)        
 			p1 = pm.xform(m_name+'_end_outJoint', ws=1, q=1, t=1)
@@ -491,11 +379,10 @@ def from_ik_to_fk(control):
 			v = v1 - v0
 			l = v.length()
 			scl_converted = l/scl
-			init_scale2 = cmds.getAttr(m_name + "_initScaleEnd_mult.input1")
-			length_2 = scl_converted/init_scale2
-			print (44444, length_1, length_3, length_2 )
-		##########################################################################
-
+			init_tEnd = cmds.getAttr(m_name + "_initScaleEnd_mult.input1")
+			lEnd = scl_converted/init_tEnd
+			print (44444, l1, l2, lEnd )
+	
 	# snapping fk controls
 	snap( getControlNameFromInternal(m_name, "fk_a") )
 	snap( getControlNameFromInternal(m_name, "fk_b") )		
@@ -503,21 +390,29 @@ def from_ik_to_fk(control):
 	if quad: 
 		snap( getControlNameFromInternal(m_name, "fk_c") )
 	if foot_m: 
+		# print(44, getControlNameFromInternal(foot_m, "fk_heel"))
 		snap(getControlNameFromInternal(foot_m, "fk_heel") )
 		snap(getControlNameFromInternal(foot_m, "fk_toe") )
 	else:
 		snap( getControlNameFromInternal(m_name, "fk_end") )
 	
-	cmds.setAttr(control + ".length1", length_1)
+	if cmds.objExists(ns+"main.skipLegLength"): # vdrugs fix
+		cmds.setAttr(control + ".ikFk", 0)
+		return
+	
+	cmds.setAttr(control + ".length1", l1)
 	if quad: 
-		cmds.setAttr(control + ".length2", length_2)
-		cmds.setAttr(control + ".length3", length_3)
+		cmds.setAttr(control + ".length2", l2)
+		cmds.setAttr(control + ".length3", lEnd)
 	else:
-		cmds.setAttr(control + ".length2", length_2)
+		cmds.setAttr(control + ".length2", lEnd)
 
 	cmds.setAttr(control + ".ikFk", 0)
 
 def snap(target, rev=True):
+	if not target:
+		print("Missed target - "+target)
+		return
 	# get helper
 	ns = getNS(target)
 	m_name = ns + getModuleName(target)
@@ -665,7 +560,6 @@ def snapElbowKnee():
 ##################################
 # Symmetry Mirror
 ##################################
-
 '''
 def getMatrix(node):
 	# Gets the world matrix of an object based on name.
@@ -960,6 +854,7 @@ def mirrorRoot(target):
 	cmds.delete(gr)	
 	cmds.select(sel)
 
+@ oneStepUndo
 def symmetry():
 	controls = cmds.ls(selection=True)
 	filtered_controls = []
@@ -1052,10 +947,25 @@ def symmetry():
 		#print control, attrList
 		if side != "c":
 			for attr in attrList:
-				#print control, attr
 				attrVar = cmds.getAttr(control + "." + attr)
 
 				try:
+					# if ctrl have mirror axis attr
+					if cmds.attributeQuery( 'mirrorAxis', node=control, exists=True ):
+						# mirror atribute and set
+						if cmds.getAttr(control + ".mirrorAxis") == 1:
+							if attr == "translateX" or attr == "rotateY" or attr == "rotateZ":
+								cmds.setAttr((ns + target + "." + attr), -attrVar)		
+								continue
+						elif cmds.getAttr(control + ".mirrorAxis") == 2:
+							if attr == "translateY" or attr == "rotateX" or attr == "rotateZ":
+								cmds.setAttr((ns + target + "." + attr), -attrVar)		
+								continue
+						elif cmds.getAttr(control + ".mirrorAxis") == 3:
+							if attr == "translateZ" or attr == "rotateX" or attr == "rotateY":
+								cmds.setAttr((ns + target + "." + attr), -attrVar)		
+								continue
+
 					cmds.setAttr((ns + target + "." + attr), attrVar)
 				except:
 					print (target, "cannot modify")
@@ -1237,6 +1147,7 @@ def getControlSide(control):
 		side = "c"
 	return side
 
+@ oneStepUndo
 def mirror():
 	controls = cmds.ls(selection=True)
 	if len(controls) == 0:
@@ -1263,7 +1174,6 @@ def mirror():
 
 	# save data of the controls with parent attr and switch to world
 	for control in filtered_controls:
-		
 		if cmds.attributeQuery( 'parent', node=control, exists=True ):
 			if cmds.attributeQuery( 'parent', node=control, keyable=True ):
 				parent = cmds.getAttr(control+".parent", asString=1)
@@ -1361,9 +1271,29 @@ def mirror():
 
 				if attr in mirrorAttrLis and use_constraint:
 					continue
-				
+
 				try:
 					old_value = cmds.getAttr(ns + target + "." + attr)
+
+					# if ctrl have mirror axis attr
+					if cmds.attributeQuery( 'mirrorAxis', node=control, exists=True ):
+						# mirror atribute and set
+						if cmds.getAttr(control + ".mirrorAxis") == 1:
+							if attr == "translateX" or attr == "rotateY" or attr == "rotateZ":
+								cmds.setAttr((ns + target + "." + attr), -attrVar)
+								cmds.setAttr((control + "." + attr), -old_value)	
+								continue
+						elif cmds.getAttr(control + ".mirrorAxis") == 2:
+							if attr == "translateY" or attr == "rotateX" or attr == "rotateZ":
+								cmds.setAttr((ns + target + "." + attr), -attrVar)
+								cmds.setAttr((control + "." + attr), -old_value)		
+								continue
+						elif cmds.getAttr(control + ".mirrorAxis") == 3:
+							if attr == "translateZ" or attr == "rotateX" or attr == "rotateY":
+								cmds.setAttr((ns + target + "." + attr), -attrVar)
+								cmds.setAttr((control + "." + attr), -old_value)		
+								continue
+					
 					cmds.setAttr((ns + target + "." + attr), attrVar)
 					cmds.setAttr((control + "." + attr), old_value)
 				except:
