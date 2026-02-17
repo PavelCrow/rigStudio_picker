@@ -107,3 +107,6 @@ updated switch IkFk script for transformed fk controls
 
 --- Version 1.0.6 ---
 updated switch IkFk script
+
+--- Version 1.0.7 ---
+returned file rs_switchIkFk.py 
