@@ -4052,6 +4052,7 @@ class MyDockingUI(QtWidgets.QWidget):
 		self.edit = edit
 		self.picker_name = None
 		self.pickers = {}
+		self.built_pickers = set()  # names of pickers whose UI is already built (lazy loading)
 		self.tab_widgets = {}
 		self.cur_picker = None
 		self.slider_scriptJobs = []
@@ -4226,17 +4227,21 @@ class MyDockingUI(QtWidgets.QWidget):
 			sel = cmds.ls(sl=1)
 
 			if len(sel) > 0:
-				#char_name = sel[-1].split(":")[0]
-				ctrl = sel[-1].split(":")[-1]
-				char_name = sel[-1].split(ctrl)[0]				
+				# namespace of the selected control (without trailing ":"), e.g.
+				# "temp3:spine_fk_2" -> "temp3". Match it against the loaded pickers
+				# by namespace instead of assuming a fixed picker node name -- the
+				# picker may be named "picker", "root_picker", etc.
+				sel_ns = sel[-1].rpartition(":")[0]
 
-				pickers = self.get_picker_nodes()
-				#print (1111, char_name, pickers)
-				if char_name+"picker_pkrData" in pickers and self.cur_picker.name != char_name+"picker":
+				target = None
+				for pname in self.pickers:
+					if pname.rpartition(":")[0] == sel_ns:
+						target = pname
+						break
 
+				if target and self.cur_picker.name != target:
 					if update:
-						print ("LOAD picker", char_name+"picker")
-						self.set_current_selector(char_name+"picker")
+						self.set_current_selector(target)
 
 			self.selectItemsFromSelected()
 
@@ -4794,7 +4799,7 @@ class MyDockingUI(QtWidgets.QWidget):
 		global save_geometry
 		# get picker nodes
 		self.picker_nodes = self.get_picker_nodes()
-		pickers_names = self.get_picker_names()
+		pickers_names = self.get_picker_names(self.picker_nodes)
 
 		# get picker files
 		if self.edit and self.win.useMatchRig_checkBox.isChecked():
@@ -4805,7 +4810,8 @@ class MyDockingUI(QtWidgets.QWidget):
 					pickers_names.append(name+" (file)")
 
 		# Clear
-		self.pickers = {}		
+		self.pickers = {}
+		self.built_pickers = set()
 
 		self.win.char_selector_cb.clear()
 		widgets_for_remove = []
@@ -4832,18 +4838,20 @@ class MyDockingUI(QtWidgets.QWidget):
 			cmds.deleteUI(window)
 
 		# fill
+		# NOTE: only the empty container widget is created here for every character.
+		# The heavy work (loading data + building all views/items) is deferred to
+		# build_picker(), triggered lazily from setCurrentPicker() when a character
+		# is actually shown. This keeps load time independent of character count.
 		for n in sorted(pickers_names):
-			# create picker 
+			# create picker
 			self.win.char_selector_cb.addItem(n.split(":picker")[0])
 			p = picker.Picker(n)
 			self.pickers[n] = p
-			p.load()
 
-			# create tabwidget
+			# create empty container widget (kept aligned with the combo box index)
 			if edit or self.panels_mode == 1:
 				self.tab_widgets[n] = ContextMenuTabWidget(self, main_window=self.win)
-				self.win.stackedWidget.addWidget(self.tab_widgets[n])	
-				self.load_picker_orig(p)
+				self.win.stackedWidget.addWidget(self.tab_widgets[n])
 			elif self.panels_mode == 2:
 				#cmds.channelBox( 'dave', p='Rig Studio Picker|horizontalLayout_5|top_layout')
 				#self.panel_widgets[n] = QtWidgets.QFrame()
@@ -4852,8 +4860,7 @@ class MyDockingUI(QtWidgets.QWidget):
 				layout = QtWidgets.QHBoxLayout( )
 				layout.setContentsMargins(0,0,0,0)
 				self.panel_widgets[n].setLayout( layout )
-				self.win.stackedWidget.addWidget(self.panel_widgets[n])		
-				self.load_picker_panel(p)
+				self.win.stackedWidget.addWidget(self.panel_widgets[n])
 			else:
 				#self.panel_widgets[n] = QtWidgets.QFrame()
 				self.panel_widgets[n] = QtWidgets.QSplitter()
@@ -4862,8 +4869,7 @@ class MyDockingUI(QtWidgets.QWidget):
 				layout = QtWidgets.QVBoxLayout( )
 				layout.setContentsMargins(0,0,0,0)
 				self.panel_widgets[n].setLayout( layout )
-				self.win.stackedWidget.addWidget(self.panel_widgets[n])		
-				self.load_picker_panel(p)
+				self.win.stackedWidget.addWidget(self.panel_widgets[n])
 
 			if len(pickers_names) > 1:
 				#cmds.progressBar(progressControl, edit=True, step=1)	
@@ -4908,9 +4914,10 @@ class MyDockingUI(QtWidgets.QWidget):
 		
 		return pickers_nodes
 
-	def get_picker_names(self):
+	def get_picker_names(self, pickers_nodes=None):
 		pickers_names = []
-		pickers_nodes = self.get_picker_nodes()
+		if pickers_nodes is None:
+			pickers_nodes = self.get_picker_nodes()
 		for p in pickers_nodes:
 			if p.split("_")[-1] == 'pkrData':
 				name = p.split("_pkrData")[0]
@@ -4937,6 +4944,29 @@ class MyDockingUI(QtWidgets.QWidget):
 		cmds.optionVar( floatValue = ( "rsPicker_splitterSizeX", x ) )
 		cmds.optionVar( floatValue = ( "rsPicker_splitterSizeY", y ) )
 
+	def build_picker(self, name):
+		# Lazily build a picker's UI (load data + create all views/items).
+		# Called from setCurrentPicker when a character is first shown, so with
+		# many characters in the scene we only pay for the ones actually opened.
+		debugStart(traceback.extract_stack()[-1][2])
+
+		if not name or name in self.built_pickers or name not in self.pickers:
+			debugEnd(traceback.extract_stack()[-1][2])
+			return
+
+		p = self.pickers[name]
+		p.load()
+
+		# mark as built before load_picker_* so it is not scheduled again
+		self.built_pickers.add(name)
+
+		if edit or self.panels_mode == 1:
+			self.load_picker_orig(p)
+		else:
+			self.load_picker_panel(p)
+
+		debugEnd(traceback.extract_stack()[-1][2])
+
 	def setCurrentPicker(self, i):
 		debugStart(traceback.extract_stack()[-1][2])
 		#print ("SET Current picker")
@@ -4946,6 +4976,9 @@ class MyDockingUI(QtWidgets.QWidget):
 		self.win.stackedWidget.setCurrentIndex(i)
 
 		name = self.get_root_name()
+
+		# lazily build this picker's UI on first access
+		self.build_picker(name)
 
 		if name in self.pickers:
 			self.cur_picker = self.pickers[name]
@@ -5148,14 +5181,14 @@ class MyDockingUI(QtWidgets.QWidget):
 			#progressControl = cmds.progressBar(maxValue=len(count)-1, minValue=0, width=300)
 			#cmds.showWindow( window )
 
-		print(111,  self.get_external_layers())
+		external_layers = self.get_external_layers()
 
 		tabs_vis = []
 		names = []
 		# set tabs data
 		for i, t_data in enumerate(tabs_data):
 			t_name = t_data["name"]
-			
+
 			view = tab_widget.getViewByName(t_name)
 			
 			if t_data["background"] != None:
@@ -5184,7 +5217,7 @@ class MyDockingUI(QtWidgets.QWidget):
 						if not self.edit:
 							skip = False
 							
-							if item_data["layer"] in self.get_external_layers():
+							if item_data["layer"] in external_layers:
 								orig_name = item_data["name"].split(item_data["layer"]+"_")[1]
 								# if "face_head" == item_data["name"] :
 								# 	print (444, orig_name)	
@@ -5219,7 +5252,7 @@ class MyDockingUI(QtWidgets.QWidget):
 						# fix mirrored attribute
 						item.mirrored = item.name.split("_")[-1] == "MIRROR"
 
-						if item.layer in self.get_external_layers():
+						if item.layer in external_layers:
 							item.setFlag(item.GraphicsItemFlag.ItemIsMovable, False)
 							item.setFlag(item.ItemSendsScenePositionChanges, False)	
 							item.setFlag(item.ItemIsSelectable, True)	
@@ -5409,6 +5442,8 @@ class MyDockingUI(QtWidgets.QWidget):
 			#progressControl = cmds.progressBar(maxValue=len(count)-1, minValue=0, width=300)
 			#cmds.showWindow( window )
 
+		external_layers = self.get_external_layers()
+
 		names = []
 		# set tabs data
 		for i, t_data in enumerate(tabs_data):
@@ -5458,7 +5493,7 @@ class MyDockingUI(QtWidgets.QWidget):
 						# fix mirrored attribute
 						item.mirrored = item.name.split("_")[-1] == "MIRROR"
 
-						if item.layer in self.get_external_layers():
+						if item.layer in external_layers:
 							item.setFlag(item.GraphicsItemFlag.ItemIsMovable, False)
 							item.setFlag(item.ItemSendsScenePositionChanges, False)	
 
@@ -5595,7 +5630,6 @@ class MyDockingUI(QtWidgets.QWidget):
 
 	def reloadPickers(self, v=False, reload=False):
 		debugStart(traceback.extract_stack()[-1][2])
-		print ("reloadPickers", v)
 
 		if not reload:
 
@@ -5680,15 +5714,18 @@ class MyDockingUI(QtWidgets.QWidget):
 	def set_current_selector(self, name):
 		debugStart(traceback.extract_stack()[-1][2])
 		#print ("SET Current selector")
-		#Will set character selector to specified data_node
+		#Will set character selector to specified picker name
+		# combo items are added as name.split(":picker")[0], so match the same way
+		# (works for any picker base name: "picker", "root_picker", ...)
+		target_text = name.split(":picker")[0]
 		for i in range(self.win.char_selector_cb.count()):
 			item_name = self.win.char_selector_cb.itemText(i)
 
-			if item_name + ":picker" == name:
+			if item_name == target_text:
 				self.win.char_selector_cb.setCurrentIndex(i)
 				return
 
-		debugEnd(traceback.extract_stack()[-1][2])	
+		debugEnd(traceback.extract_stack()[-1][2])
 
 	def updateItemFrame(self):
 		debugStart(traceback.extract_stack()[-1][2])
