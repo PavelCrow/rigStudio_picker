@@ -107,6 +107,19 @@ def getNS(ctrl):
 	else:
 		return ""
 
+def getMirrorFlipAxis(control):
+	# Which local axis the mirror flip rotates 180 about, for worldSpace controls
+	# mirrored by constraint. Read from an optional 'mirrorFlipAxis' attribute on
+	# the control (1=X, 2=Y, 3=Z). Defaults to X for backward compatibility.
+	# Set it (e.g. to 2 for Y) on controls whose orientation needs another axis.
+	if control and cmds.objExists(control + ".mirrorFlipAxis"):
+		return {0: ".rx", 1: ".ry", 2: ".rz"}.get(cmds.getAttr(control + ".mirrorFlipAxis"), ".rx")
+	# fallback for rigs where the attribute can't be added: recognise known
+	# controls by internalName (ik_end hand/foot controls need a Y flip).
+	if control and getInternalNameFromControl(control) == "ik_end":
+		return ".ry"
+	return ".rx"
+
 def getInputNode(obj, attr):
 	if cmds.connectionInfo( obj+"."+attr, isDestination=True):
 		inputAttr = cmds.connectionInfo( obj+"."+attr, sourceFromDestination=True)	
@@ -164,15 +177,13 @@ def switchIkFk(simple=False):
 		ns = getNS(sel)
 		# intName = getInternalNameFromControl(sel)
 		m_name = ns + getModuleName(sel)
-		print(333, m_name)
 		# get switch control
 		mod = m_name + "_mod"
 		if cmds.objExists(mod+".ikFk"):
 			control = getInputNode(mod, "ikFk")
 		else:
 			control = getControlNameFromInternal(m_name, "control")
-			print(444, control)
-		
+
 		if control == "":
 			cmds.warning('Control with ikFk attribute is not found')
 		else:
@@ -312,7 +323,7 @@ def from_fk_to_ik(control):
 
 def from_ik_to_fk(control):
 	print ("--- switch ik to fk ---")
-	
+
 	# get variables
 	ns = getNS(control)
 	m_name = ns + getModuleName(control)
@@ -359,8 +370,7 @@ def from_ik_to_fk(control):
 			scl_converted = l/scl
 			init_tEnd = cmds.getAttr(m_name + "_initScaleEnd_mult.input1")
 			l2 = scl_converted/init_tEnd
-			print (444, l1, l2)
-			
+
 		else:
 			p0 = pm.xform(m_name+'_knee_outJoint', ws=1, q=1, t=1)        
 			p1 = pm.xform(m_name+'_ankle_outJoint', ws=1, q=1, t=1)
@@ -381,8 +391,7 @@ def from_ik_to_fk(control):
 			scl_converted = l/scl
 			init_tEnd = cmds.getAttr(m_name + "_initScaleEnd_mult.input1")
 			lEnd = scl_converted/init_tEnd
-			print (44444, l1, l2, lEnd )
-	
+
 	# snapping fk controls
 	snap( getControlNameFromInternal(m_name, "fk_a") )
 	snap( getControlNameFromInternal(m_name, "fk_b") )		
@@ -725,43 +734,46 @@ def mirrorByMatrix(source, target, ns):
 	cmds.rotate( 0, cmds.getAttr(ns + "mirror_loc.ry")*2, 0, source, relative=True, worldSpace=True )
 '''
 def symmetryByConstraint(source, target, ns):
+	# One-way version of mirrorByConstraint: builds the target exactly like
+	# mirrorByConstraint's target path (two grouped locators) so the rotation
+	# matches the working mirror; the source is left untouched.
 	sel = cmds.ls(sl=True)
-	
-	loc = cmds.spaceLocator()
-	cmds.parent(loc, ns+"mirror_loc")
-	con = cmds.parentConstraint(source, loc)
-	cmds.delete(con)
-	gr = cmds.group(loc)
+
+	loc1 = cmds.spaceLocator()
+	cmds.parent(loc1, ns+"mirror_loc")
+	con1 = cmds.parentConstraint(source, loc1)
+	loc2 = cmds.spaceLocator()
+	cmds.parent(loc2, ns+"mirror_loc")
+	con2 = cmds.parentConstraint(target, loc2)
+
+	cmds.delete(con1, con2)
+	gr = cmds.group(loc1, loc2)
 	cmds.xform(os=1, piv=(0,0,0) )
 	cmds.setAttr(gr+".scaleX", -1)
-	
-	loc2 = cmds.duplicate(loc)[0]
-	cmds.parent(loc2, loc)
-	
-	cmds.setAttr(loc2+".rx", 180)
-	
-	parent = False
-	point = False
-	orient = False
+
+	loc1_2 = cmds.duplicate(loc1)[0]
+	cmds.parent(loc1_2, loc1)
+	cmds.setAttr(loc1_2 + getMirrorFlipAxis(target), 180)
+
 	if not cmds.getAttr(target+'.tx', lock=True) and not cmds.getAttr(target+'.rx', lock=True):
-		con = cmds.parentConstraint(loc2, target, mo=0)
+		con = cmds.parentConstraint(loc1_2, target, mo=0)
 		hasTKeys = cmds.keyframe(target+".t", q=1) or []
 		hasRKeys = cmds.keyframe(target+".r", q=1) or []
 		if hasTKeys:
 			cmds.setKeyframe(target+".t")
 		if hasRKeys:
-			cmds.setKeyframe(target+".r")			
+			cmds.setKeyframe(target+".r")
 	elif not cmds.getAttr(target+'.tx', lock=True):
-		con = cmds.pointConstraint(loc2, target, mo=0)
+		con = cmds.pointConstraint(loc1_2, target, mo=0)
 		hasTKeys = cmds.keyframe(target+".t", q=1) or []
 		if hasTKeys:
-			cmds.setKeyframe(target+".t")			
+			cmds.setKeyframe(target+".t")
 	elif not cmds.getAttr(target+'.rx', lock=True):
-		con = cmds.orientConstraint(loc2, target, mo=0)
+		con = cmds.orientConstraint(loc1_2, target, mo=0)
 		hasRKeys = cmds.keyframe(target+".r", q=1) or []
 		if hasRKeys:
-			cmds.setKeyframe(target+".r")			
-	
+			cmds.setKeyframe(target+".r")
+
 	cmds.delete(gr)
 	cmds.select(sel)
 
@@ -830,7 +842,7 @@ def mirrorRoot(target):
 	
 	loc2 = cmds.duplicate(loc)[0]
 	cmds.parent(loc2, loc)
-	cmds.setAttr(loc2+".rx", 180)
+	cmds.setAttr(loc2 + getMirrorFlipAxis(target), 180)
 
 	if not cmds.getAttr(target+'.tx', lock=True) and not cmds.getAttr(target+'.rx', lock=True):
 		con = cmds.parentConstraint(loc2, target, mo=0)
@@ -839,19 +851,19 @@ def mirrorRoot(target):
 		if hasTKeys:
 			cmds.setKeyframe(target+".t")
 		if hasRKeys:
-			cmds.setKeyframe(target+".r")			
+			cmds.setKeyframe(target+".r")
 	elif not cmds.getAttr(target+'.tx', lock=True):
 		con = cmds.pointConstraint(loc2, target, mo=0)
 		hasTKeys = cmds.keyframe(target+".t", q=1) or []
 		if hasTKeys:
-			cmds.setKeyframe(target+".t")	
+			cmds.setKeyframe(target+".t")
 	elif not cmds.getAttr(target+'.rx', lock=True):
 		con = cmds.orientConstraint(loc2, target, mo=0)
 		hasRKeys = cmds.keyframe(target+".r", q=1) or []
 		if hasRKeys:
-			cmds.setKeyframe(target+".r")			
-	
-	cmds.delete(gr)	
+			cmds.setKeyframe(target+".r")
+
+	cmds.delete(gr)
 	cmds.select(sel)
 
 @ oneStepUndo
@@ -955,15 +967,15 @@ def symmetry():
 						# mirror atribute and set
 						if cmds.getAttr(control + ".mirrorAxis") == 1:
 							if attr == "translateX" or attr == "rotateY" or attr == "rotateZ":
-								cmds.setAttr((ns + target + "." + attr), -attrVar)		
+								cmds.setAttr((ns + target + "." + attr), -attrVar)
 								continue
 						elif cmds.getAttr(control + ".mirrorAxis") == 2:
 							if attr == "translateY" or attr == "rotateX" or attr == "rotateZ":
-								cmds.setAttr((ns + target + "." + attr), -attrVar)		
+								cmds.setAttr((ns + target + "." + attr), -attrVar)
 								continue
 						elif cmds.getAttr(control + ".mirrorAxis") == 3:
 							if attr == "translateZ" or attr == "rotateX" or attr == "rotateY":
-								cmds.setAttr((ns + target + "." + attr), -attrVar)		
+								cmds.setAttr((ns + target + "." + attr), -attrVar)
 								continue
 
 					cmds.setAttr((ns + target + "." + attr), attrVar)
@@ -1022,7 +1034,8 @@ def symmetry():
 					except: pass			
 					
 			elif cmds.attributeQuery( 'worldSpace', node=control, exists=True ):
-				if cmds.getAttr(control + ".worldSpace"):
+				# skip if already handled by SymmetryWolrdConrols, else double transform
+				if cmds.getAttr(control + ".worldSpace") and control not in worldCenter_controls:
 					symmetryRoot(control)
 					
 	if worldCenter_controls:
@@ -1050,8 +1063,8 @@ def mirrorByConstraint(source, target, ns):
 	
 	loc1_2 = cmds.duplicate(loc1)[0]
 	cmds.parent(loc1_2, loc1)
-	cmds.setAttr(loc1_2+".rx", 180)
-	
+	cmds.setAttr(loc1_2 + getMirrorFlipAxis(target), 180)
+
 	if not cmds.getAttr(target+'.tx', lock=True) and not cmds.getAttr(target+'.rx', lock=True):
 		con = cmds.parentConstraint(loc1_2, target, mo=0)
 		hasTKeys = cmds.keyframe(target+".t", q=1) or []
@@ -1073,7 +1086,7 @@ def mirrorByConstraint(source, target, ns):
 		
 	loc2_2 = cmds.duplicate(loc2)[0]
 	cmds.parent(loc2_2, loc2)
-	cmds.setAttr(loc2_2+".rx", 180)
+	cmds.setAttr(loc2_2 + getMirrorFlipAxis(source), 180)
 
 	if not cmds.getAttr(source+'.tx', lock=True) and not cmds.getAttr(source+'.rx', lock=True):
 		con = cmds.parentConstraint(loc2_2, source, mo=0)
@@ -1117,7 +1130,7 @@ def mirrorWolrdConrolsEnd(targets):
 	for target in targets:
 		loc2 = cmds.duplicate(target+"_MIRROR_LOC")[0]
 		cmds.parent(loc2, target+"_MIRROR_LOC")
-		cmds.setAttr(loc2+".rx", 180)
+		cmds.setAttr(loc2 + getMirrorFlipAxis(target), 180)
 
 		if not cmds.getAttr(target+'.tx', lock=True) and not cmds.getAttr(target+'.rx', lock=True):
 			con = cmds.parentConstraint(loc2, target, mo=0)
@@ -1350,8 +1363,10 @@ def mirror():
 					except: pass					
 					
 			elif cmds.attributeQuery( 'worldSpace', node=control, exists=True ):
-				if cmds.getAttr(control + ".worldSpace"):
-					mirrorRoot(control)					
+				# skip if already handled by mirrorWolrdConrolsStart/End, otherwise
+				# it gets mirrored twice (double transform breaks a marquee select)
+				if cmds.getAttr(control + ".worldSpace") and control not in worldCenter_controls:
+					mirrorRoot(control)
 		
 	if worldCenter_controls:
 		mirrorWolrdConrolsEnd(worldCenter_controls)	
