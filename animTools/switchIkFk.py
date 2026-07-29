@@ -833,6 +833,8 @@ def mirrorByMatrix(source, target, ns):
 def symmetryByConstraint(source, target, ns):
 	sel = cmds.ls(sl=True)
 	
+	m_name = getModuleName(source)
+
 	loc = cmds.spaceLocator()
 	cmds.parent(loc, ns+"mirror_loc")
 	con = cmds.parentConstraint(source, loc)
@@ -843,8 +845,14 @@ def symmetryByConstraint(source, target, ns):
 	
 	loc2 = cmds.duplicate(loc)[0]
 	cmds.parent(loc2, loc)
+
+	ik_symmetry = False
+	if cmds.objExists(ns+m_name+"_mod.ikSymmetryBehaviour"):
+		if cmds.getAttr(ns+m_name+"_mod.ikSymmetryBehaviour"):
+			ik_symmetry = True
 	
-	cmds.setAttr(loc2+".rx", 180)
+	if not ik_symmetry:
+		cmds.setAttr(loc2+".rx", 180)
 	
 	parent = False
 	point = False
@@ -962,7 +970,7 @@ def mirrorRoot(target):
 
 def symmetry():
 	cmds.undoInfo(openChunk=True)
-
+	
 	controls = cmds.ls(selection=True)
 	filtered_controls = []
 	clear_names = []
@@ -1129,11 +1137,13 @@ def symmetry():
 
 def mirrorByConstraint(source, target, ns):
 	sel = cmds.ls(sl=True)
-	
-	loc1 = cmds.spaceLocator()
+
+	m_name = getModuleName(source)
+
+	loc1 = cmds.spaceLocator()[0]
 	cmds.parent(loc1, ns+"mirror_loc")
 	con1 = cmds.parentConstraint(source, loc1)
-	loc2 = cmds.spaceLocator()
+	loc2 = cmds.spaceLocator()[0]
 	cmds.parent(loc2, ns+"mirror_loc")
 	con2 = cmds.parentConstraint(target, loc2)
 		
@@ -1144,7 +1154,14 @@ def mirrorByConstraint(source, target, ns):
 	
 	loc1_2 = cmds.duplicate(loc1)[0]
 	cmds.parent(loc1_2, loc1)
-	cmds.setAttr(loc1_2+".rx", 180)
+	
+	ik_symmetry = False
+	if cmds.objExists(ns+m_name+"_mod.ikSymmetryBehaviour"):
+		if cmds.getAttr(ns+m_name+"_mod.ikSymmetryBehaviour"):
+			ik_symmetry = True
+
+	if not ik_symmetry:
+		cmds.setAttr(loc1_2+".rx", 180)
 	
 	if not cmds.getAttr(target+'.tx', lock=True) and not cmds.getAttr(target+'.rx', lock=True):
 		con = cmds.parentConstraint(loc1_2, target, mo=0)
@@ -1164,11 +1181,13 @@ def mirrorByConstraint(source, target, ns):
 		hasRKeys = cmds.keyframe(target+".r", q=1) or []
 		if hasRKeys:
 			cmds.setKeyframe(target+".r")			
-		
+	
 	loc2_2 = cmds.duplicate(loc2)[0]
 	cmds.parent(loc2_2, loc2)
-	cmds.setAttr(loc2_2+".rx", 180)
 
+	if not ik_symmetry:
+		cmds.setAttr(loc2+".rx", 180)
+	
 	if not cmds.getAttr(source+'.tx', lock=True) and not cmds.getAttr(source+'.rx', lock=True):
 		con = cmds.parentConstraint(loc2_2, source, mo=0)
 		hasTKeys = cmds.keyframe(source+".t", q=1) or []
