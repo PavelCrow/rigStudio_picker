@@ -110,3 +110,6 @@ updated switch IkFk script
 
 --- Version 1.0.7 ---
 returned file rs_switchIkFk.py 
+
+--- Version 1.0.8 ---
+updated switchIkFk.py 
