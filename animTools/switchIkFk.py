@@ -219,6 +219,33 @@ def getModuleScale(m_name):
 	cmds.warning('Cannot find scale node for module ' + m_name + ', using 1.0')
 	return 1.0
 
+MIRROR_FLIP_AXES = {0: None, 1: ".rx", 2: ".ry", 3: ".rz"}
+
+def getMirrorFlipAxis(control):
+	# Вокруг какой локальной оси делается разворот на 180 при зеркалировании
+	# worldSpace-контрола через констрейнт. None - разворот не нужен вовсе.
+	#
+	# Ось задаётся на самом контроле атрибутом mirrorFlipAxis:
+	#     0 - без разворота, 1 - X, 2 - Y, 3 - Z
+	# Если атрибута нет, работает эвристика по internalName.
+	#
+	# Функция появилась в 986b1dd и потерялась в 1.0.8 вместе с заменой на
+	# проверку ikSymmetryBehaviour - ось захардкодили в X, и контролы, которым
+	# нужна другая, стало перекручивать.
+	if control and cmds.objExists(control + ".mirrorFlipAxis"):
+		return MIRROR_FLIP_AXES.get(cmds.getAttr(control + ".mirrorFlipAxis"), ".rx")
+
+	if control and getInternalNameFromControl(control) == "ik_end":
+		return ".ry"
+
+	return ".rx"
+
+def applyMirrorFlip(loc, control):
+	# Разворот локатора на 180 вокруг оси, нужной этому контролу.
+	axis = getMirrorFlipAxis(control)
+	if axis:
+		cmds.setAttr(loc + axis, 180)
+
 def isReversedAttr(control, attr):
 	# Флаг reverse_<attr> на контроле: так старые риги (rs_switchIkFk) задают,
 	# какие каналы инвертируются при зеркалировании. На новых ригах атрибута нет
@@ -923,7 +950,7 @@ def symmetryByConstraint(source, target, ns):
 			ik_symmetry = True
 	
 	if not ik_symmetry:
-		cmds.setAttr(loc2+".rx", 180)
+		applyMirrorFlip(loc2, target)
 	
 	parent = False
 	point = False
@@ -1015,7 +1042,7 @@ def mirrorRoot(target):
 	
 	loc2 = cmds.duplicate(loc)[0]
 	cmds.parent(loc2, loc)
-	cmds.setAttr(loc2+".rx", 180)
+	applyMirrorFlip(loc2, target)
 
 	if not cmds.getAttr(target+'.tx', lock=True) and not cmds.getAttr(target+'.rx', lock=True):
 		con = cmds.parentConstraint(loc2, target, mo=0)
@@ -1235,7 +1262,7 @@ def mirrorByConstraint(source, target, ns):
 			ik_symmetry = True
 
 	if not ik_symmetry:
-		cmds.setAttr(loc1_2+".rx", 180)
+		applyMirrorFlip(loc1_2, target)
 	
 	if not cmds.getAttr(target+'.tx', lock=True) and not cmds.getAttr(target+'.rx', lock=True):
 		con = cmds.parentConstraint(loc1_2, target, mo=0)
@@ -1260,7 +1287,7 @@ def mirrorByConstraint(source, target, ns):
 	cmds.parent(loc2_2, loc2)
 
 	if not ik_symmetry:
-		cmds.setAttr(loc2_2+".rx", 180)
+		applyMirrorFlip(loc2_2, source)
 	
 	if not cmds.getAttr(source+'.tx', lock=True) and not cmds.getAttr(source+'.rx', lock=True):
 		con = cmds.parentConstraint(loc2_2, source, mo=0)
@@ -1304,7 +1331,7 @@ def mirrorWolrdConrolsEnd(targets):
 	for target in targets:
 		loc2 = cmds.duplicate(target+"_MIRROR_LOC")[0]
 		cmds.parent(loc2, target+"_MIRROR_LOC")
-		cmds.setAttr(loc2+".rx", 180)
+		applyMirrorFlip(loc2, target)
 
 		if not cmds.getAttr(target+'.tx', lock=True) and not cmds.getAttr(target+'.rx', lock=True):
 			con = cmds.parentConstraint(loc2, target, mo=0)

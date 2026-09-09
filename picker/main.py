@@ -34,6 +34,15 @@ else:
 # Присваиваем безусловно, а не через setdefault: иначе более ранний импорт из
 # окружения (userSetup.py, полка) оставил бы старую копию.
 import rigStudio_picker.animTools.switchIkFk as _switchIkFk
+
+# Перезагружаем вместе с main - так же, как picker.picker и utils выше.
+# Без этого правки в switchIkFk.py не подхватываются перезапуском пикера:
+# модуль остаётся в кэше импортов до перезапуска самой Maya.
+if sys.version[0] == "2":
+	reload(_switchIkFk)
+else:
+	importlib.reload(_switchIkFk)
+
 sys.modules["rs_switchIkFk"] = _switchIkFk
 
 
@@ -543,6 +552,7 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 
 		self.namespace = namespace
 		self.picker_name = picker_name
+		self._view_state_restored = False
 		self.main = main
 		self.main_window = main_window
 		#try:
@@ -553,7 +563,10 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 		# Scale view in Y for positive Y values (maya-like)
 		self.scale(1, 1)
 
-		# self.setResizeAnchor(self.AnchorViewCenter)
+		# При ресайзе держим центр вьюпорта, а не левый верхний угол: иначе
+		# растягивание окна (и раскладка виджета при первом показе) уводит
+		# содержимое в сторону от заданного centerOn.
+		self.setResizeAnchor(self.ViewportAnchor.AnchorViewCenter)
 
 		# TODO
 		# Set selection mode
@@ -620,6 +633,42 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 				name = ""
 		# в имени пикера бывает неймспейс с ":" - в имени optionVar он не нужен
 		return "%s_%s" % (re.sub(r"[^0-9a-zA-Z_]", "_", name or ""), self.tab_name)
+
+	def restore_view_state(self):
+		# Возвращает сохранённые зум и позицию вьюпорта.
+		key = self.get_optionvar_key()
+
+		s = cmds.optionVar( q='rsPicker_viewSize_%s' %key)
+		if s:
+			self.setTransform(QtGui.QTransform(s, 0.000000, 0.000000, s, 0.000000, 0.000000))
+
+		x = cmds.optionVar( q='rsPicker_viewPosX_%s' %key)
+		y = cmds.optionVar( q='rsPicker_viewPosY_%s' %key)
+		self.centerOn(x, y)
+
+	def restore_view_state_once(self):
+		# Восстанавливаем вид ОДИН раз - когда вьюха впервые получила реальный
+		# размер. Раньше это делалось в setCurrentPicker сразу после создания
+		# вьюх: centerOn считается от размера вьюпорта, а он тогда ещё нулевой,
+		# прокрутка упиралась в край, и позиция уезжала. Вкладки с сохранённым
+		# центром около нуля попадали правильно случайно - поэтому баг выглядел
+		# выборочным. showEvent тоже приходит слишком рано, до раскладки,
+		# так что ждём именно размера.
+		if self._view_state_restored:
+			return
+		if self.viewport().width() < 50 or self.viewport().height() < 50:
+			return
+
+		self._view_state_restored = True
+		self.restore_view_state()
+
+	def showEvent(self, event):
+		QtWidgets.QGraphicsView.showEvent(self, event)
+		self.restore_view_state_once()
+
+	def resizeEvent(self, event):
+		QtWidgets.QGraphicsView.resizeEvent(self, event)
+		self.restore_view_state_once()
 
 	def mousePressEvent(self, event):
 		if event.button() == QtCore.Qt.LeftButton:
@@ -5061,16 +5110,10 @@ class MyDockingUI(QtWidgets.QWidget):
 		# views size and position
 		views = self.views[self.get_root_name()]
 		for view in views:
-			key = view.get_optionvar_key()
-			s = cmds.optionVar( q='rsPicker_viewSize_%s' %key)
-
-			if s:
-				m = QtGui.QTransform(s, 0.000000, 0.000000, s, 0.000000, 0.000000)
-				# m = QtGui.QMatrix(2, 0, 0, 2, 10, 20)
-				view.setTransform(m)
-			x = cmds.optionVar( q='rsPicker_viewPosX_%s' %key)
-			y = cmds.optionVar( q='rsPicker_viewPosY_%s' %key)
-			view.centerOn(x,y)
+			# вьюха восстановится сама, как только получит реальный размер
+			# (showEvent / resizeEvent); здесь только подталкиваем тех, кто
+			# размер уже имеет - например при переключении персонажа
+			view.restore_view_state_once()
 
 			# restore splitter sizes
 			try:
