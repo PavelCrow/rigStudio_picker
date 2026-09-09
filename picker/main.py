@@ -27,6 +27,15 @@ else:
 	importlib.reload(utils)
 	import rigStudio_picker.animTools as animTools
 
+# Часть item-скриптов в сценах делает "import rs_switchIkFk" без пакета - он
+# резолвился из scripts-папки Maya, мимо этого репозитория. Модули слиты
+# (см. animTools/rs_switchIkFk.py), поэтому заводим псевдоним в кэше импортов:
+# такой import получит наш модуль, и сцены править не нужно.
+# Присваиваем безусловно, а не через setdefault: иначе более ранний импорт из
+# окружения (userSetup.py, полка) оставил бы старую копию.
+import rigStudio_picker.animTools.switchIkFk as _switchIkFk
+sys.modules["rs_switchIkFk"] = _switchIkFk
+
 
 try:
 	from PySide2 import QtWidgets, QtGui, QtCore, QtUiTools
@@ -357,7 +366,7 @@ class ContextMenuTabWidget(QtWidgets.QTabWidget):
 		self.main.cur_picker.data = data
 
 		# Add tab
-		self.addTab(GraphicViewWidget(main=self.main, main_window=self.main_window, tab_name=name), name)
+		self.addTab(GraphicViewWidget(main=self.main, main_window=self.main_window, tab_name=name, picker_name=self.main.cur_picker.name), name)
 
 		# update views list
 		#print 111, self.views, len(self.views)
@@ -527,12 +536,13 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 
 	def __init__(self,
                  namespace=None, main=None,
-                 main_window=None, tab_name=None):
+                 main_window=None, tab_name=None, picker_name=None):
 		QtWidgets.QGraphicsView.__init__(self)
 
 		self.setScene(OrderedGraphicsScene())
 
 		self.namespace = namespace
+		self.picker_name = picker_name
 		self.main = main
 		self.main_window = main_window
 		#try:
@@ -594,6 +604,22 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 	def get_center_pos(self):
 		return self.mapToScene(QtCore.QPoint(self.width() / 2,
                                              self.height() / 2))
+
+	def get_optionvar_key(self):
+		# Суффикс ключа optionVar с позицией и зумом вьюпорта.
+		# Раньше ключ состоял только из имени вкладки ("rsPicker_viewPosX_body"),
+		# то есть был общим для всех персонажей: два пикера с одинаковыми именами
+		# вкладок перетирали друг другу сохранённый вид, и после удаления одного
+		# из них второй открывался уехавшим в сторону.
+		# Теперь в ключ входит имя пикера.
+		name = self.picker_name
+		if not name:
+			try:
+				name = self.main.cur_picker.name
+			except AttributeError:
+				name = ""
+		# в имени пикера бывает неймспейс с ":" - в имени optionVar он не нужен
+		return "%s_%s" % (re.sub(r"[^0-9a-zA-Z_]", "_", name or ""), self.tab_name)
 
 	def mousePressEvent(self, event):
 		if event.button() == QtCore.Qt.LeftButton:
@@ -983,12 +1009,13 @@ class GraphicViewWidget(QtWidgets.QGraphicsView):
 
 				self.centerValueX = self.get_center_pos().x()
 				self.centerValueY = self.get_center_pos().y()
-				cmds.optionVar( floatValue = ( "rsPicker_viewPosX_%s" %self.tab_name, self.centerValueX ) )
-				cmds.optionVar( floatValue = ( "rsPicker_viewPosY_%s" %self.tab_name, self.centerValueY ) )
+				key = self.get_optionvar_key()
+				cmds.optionVar( floatValue = ( "rsPicker_viewPosX_%s" %key, self.centerValueX ) )
+				cmds.optionVar( floatValue = ( "rsPicker_viewPosY_%s" %key, self.centerValueY ) )
 			if (self.zoom_active and event.button() == QtCore.Qt.RightButton):
 				self.zoom_active = False
 				self.sizeValue = self.transform().m11()
-				cmds.optionVar( floatValue = ( "rsPicker_viewSize_%s" %self.tab_name, self.sizeValue ) )	
+				cmds.optionVar( floatValue = ( "rsPicker_viewSize_%s" %self.get_optionvar_key(), self.sizeValue ) )
 
 		elif (event.button() == QtCore.Qt.RightButton):
 			sel_area = QtCore.QRectF(scene_pos.x(), scene_pos.y(), 2.0, 2.0)	
@@ -2779,8 +2806,8 @@ class PickerItem(DefaultPolygon):
 				else:
 					try:
 						exec (cmd)#, localsParameter)	
-					except: 
-						cmds.warning("Error in the script of the item: "+self.name)
+					except:
+						cmds.warning("Error in the script of the item: %s\n%s" %(self.name, traceback.format_exc()))
 				#self.mouse_press_custom_action(event)
 
 
@@ -3627,7 +3654,7 @@ class PickerItem(DefaultPolygon):
 		self.visible = vis
 		self.text.visible = vis
 		self.setFlag(self.GraphicsItemFlag.ItemIsMovable, vis)
-		self.setFlag(self.ItemSendsScenePositionChanges, vis)			
+		self.setFlag(self.GraphicsItemFlag.ItemSendsScenePositionChanges, vis)
 
 	def get_data(self):
 		# Init data dict
@@ -5014,7 +5041,7 @@ class MyDockingUI(QtWidgets.QWidget):
 				try:
 					exec (cmd)
 				except:
-					cmds.warning ("Autorun external script error "+ self.cur_picker.name)
+					cmds.warning ("Autorun external script error %s\n%s" %(self.cur_picker.name, traceback.format_exc()))
 
 		# local autorun	
 		self.autorun = self.cur_picker.data["autorun"]
@@ -5029,20 +5056,21 @@ class MyDockingUI(QtWidgets.QWidget):
 					if cmd:
 						exec (cmd)		
 				except:
-					cmds.warning ("Autorun script error "+ self.cur_picker.name)			
+					cmds.warning ("Autorun script error %s\n%s" %(self.cur_picker.name, traceback.format_exc()))
 
 		# views size and position
 		views = self.views[self.get_root_name()]
 		for view in views:
-			s = cmds.optionVar( q='rsPicker_viewSize_%s' %view.tab_name)
-			
+			key = view.get_optionvar_key()
+			s = cmds.optionVar( q='rsPicker_viewSize_%s' %key)
+
 			if s:
 				m = QtGui.QTransform(s, 0.000000, 0.000000, s, 0.000000, 0.000000)
 				# m = QtGui.QMatrix(2, 0, 0, 2, 10, 20)
 				view.setTransform(m)
-			x = cmds.optionVar( q='rsPicker_viewPosX_%s' %view.tab_name)
-			y = cmds.optionVar( q='rsPicker_viewPosY_%s' %view.tab_name)
-			view.centerOn(x,y)			
+			x = cmds.optionVar( q='rsPicker_viewPosX_%s' %key)
+			y = cmds.optionVar( q='rsPicker_viewPosY_%s' %key)
+			view.centerOn(x,y)
 
 			# restore splitter sizes
 			try:
@@ -5071,6 +5099,7 @@ class MyDockingUI(QtWidgets.QWidget):
 		if not picker:
 			return
 		name = picker.name
+		picker_name = name   # ниже name переиспользуется под имена итемов
 		self.cur_picker = picker
 		tab_widget = self.tab_widgets[name]
 
@@ -5094,7 +5123,7 @@ class MyDockingUI(QtWidgets.QWidget):
 
 		for i, t_data in enumerate(tabs_data):
 			t_name = t_data["name"]
-			tab_widget.addTab(GraphicViewWidget(namespace=ns, main=self, main_window=self.win, tab_name=t_name), t_name)
+			tab_widget.addTab(GraphicViewWidget(namespace=ns, main=self, main_window=self.win, tab_name=t_name, picker_name=picker_name), t_name)
 
 		tab_widget.setCurrentIndex(0)
 
@@ -5148,7 +5177,7 @@ class MyDockingUI(QtWidgets.QWidget):
 											#print (444, item_data["name"])
 
 							else:
-								tab_widget.addTab(GraphicViewWidget(namespace=ns, main=self, main_window=self.win, tab_name=t_name), t_data["name"])
+								tab_widget.addTab(GraphicViewWidget(namespace=ns, main=self, main_window=self.win, tab_name=t_name, picker_name=picker_name), t_data["name"])
 
 								# add every item with renaming
 								for item_data in t_data["items"]:
@@ -5254,8 +5283,8 @@ class MyDockingUI(QtWidgets.QWidget):
 
 						if item.layer in external_layers:
 							item.setFlag(item.GraphicsItemFlag.ItemIsMovable, False)
-							item.setFlag(item.ItemSendsScenePositionChanges, False)	
-							item.setFlag(item.ItemIsSelectable, True)	
+							item.setFlag(item.GraphicsItemFlag.ItemSendsScenePositionChanges, False)
+							item.setFlag(item.GraphicsItemFlag.ItemIsSelectable, True)
 
 						if item.slider_item:
 							item.slider_item.name = item.name+"_slider"
@@ -5339,6 +5368,7 @@ class MyDockingUI(QtWidgets.QWidget):
 			return
 
 		name = picker.name
+		picker_name = name   # ниже name переиспользуется под имена итемов
 		self.cur_picker = picker
 		panel_widget = self.panel_widgets[name]
 
@@ -5368,7 +5398,7 @@ class MyDockingUI(QtWidgets.QWidget):
 
 			tab_widget = ContextMenuTabWidget(self, main_window=self.win)
 			panel_widget.layout().addWidget(tab_widget)				
-			tab_widget.addTab(GraphicViewWidget(namespace=ns, main=self, main_window=self.win, tab_name=t_name), t_name)
+			tab_widget.addTab(GraphicViewWidget(namespace=ns, main=self, main_window=self.win, tab_name=t_name, picker_name=picker_name), t_name)
 
 			# set views list, data and indexes
 			view = tab_widget.widget(0)
@@ -5495,7 +5525,7 @@ class MyDockingUI(QtWidgets.QWidget):
 
 						if item.layer in external_layers:
 							item.setFlag(item.GraphicsItemFlag.ItemIsMovable, False)
-							item.setFlag(item.ItemSendsScenePositionChanges, False)	
+							item.setFlag(item.GraphicsItemFlag.ItemSendsScenePositionChanges, False)
 
 						if item.slider_item:
 							item.slider_item.name = item.name+"_slider"
@@ -6456,7 +6486,7 @@ class MyDockingUI(QtWidgets.QWidget):
 				try:
 					exec (cmd)#, localsParameter)
 				except:
-					cmds.warning ("Run autorun script error ")
+					cmds.warning ("Run autorun script error %s\n%s" %(self.cur_picker.name, traceback.format_exc()))
 
 		debugEnd(traceback.extract_stack()[-1][2])	
 
@@ -6736,10 +6766,21 @@ class MyDockingUI(QtWidgets.QWidget):
 			f.write(json_string)			
 
 	def zoomReset(self):
+		# Сбрасывает ТОЛЬКО текущую вкладку: self.view обновляется при
+		# переключении вкладок (tab_switch), остальные не трогаем.
+		if not self.view:
+			return
+
+		# центрируем по фактическому охвату кнопок, а не по нулю сцены:
+		# иначе при сбитом виде кнопки могут остаться за краем
+		center = self.view.scene().itemsBoundingRect().center()
 		self.view.setTransform(QtGui.QTransform())
-		cmds.optionVar( floatValue = ( "rsPicker_viewSize_%s" %self.view.tab_name, 1 ) )
-		cmds.optionVar( floatValue = ( "rsPicker_viewPosX_%s" %self.view.tab_name, 0 ) )
-		cmds.optionVar( floatValue = ( "rsPicker_viewPosY_%s" %self.view.tab_name, 0 ) )
+		self.view.centerOn(center)
+
+		key = self.view.get_optionvar_key()
+		cmds.optionVar( floatValue = ( "rsPicker_viewSize_%s" %key, 1 ) )
+		cmds.optionVar( floatValue = ( "rsPicker_viewPosX_%s" %key, center.x() ) )
+		cmds.optionVar( floatValue = ( "rsPicker_viewPosY_%s" %key, center.y() ) )
 
 	def action_about(self):
 		debugStart(traceback.extract_stack()[-1][2])

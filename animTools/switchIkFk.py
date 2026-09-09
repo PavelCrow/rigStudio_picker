@@ -28,17 +28,39 @@ ns = ""
 ##################################
 
 def getModuleName(obj): #
+	# Имя модуля без неймспейса.
+	# Два способа: по DAG-пути (риги pig_human и новее) и по атрибуту .moduleName
+	# (старые риги, бывший getModuleNameFromAttr). Берём тот, чей результат
+	# указывает на реально существующий <модуль>_mod - так один модуль работает
+	# на обоих поколениях ригов в одной сцене, без глобального переключателя.
 	if obj == None or obj == "" or not cmds.objExists(obj):
-		return None	
+		return ""
+
+	ns = getNS(obj)
+	names = []
+
+	# 1) по DAG-пути
 	j = obj.replace("skinJoint", "outJoint")
 	# j = obj.replace("joint", "outJoint")
-
 	path = cmds.ls(j, l=1) or []
-	
-	# moduleName = path[0].split("modules|")[-1].split("_mod|")[0].split("_mod")[0]
-	moduleName = path[0].split("modules|")[-1].split("_mod|")[0].split("_mod")[0].split(":")[-1]
-	# print(222, path, moduleName)
-	return moduleName
+	if path:
+		names.append(path[0].split("modules|")[-1].split("_mod|")[0].split("_mod")[0].split(":")[-1])
+
+	# 2) по атрибуту
+	if cmds.attributeQuery( 'moduleName', node=obj, exists=True ):
+		names.append(cmds.getAttr(obj+'.moduleName') or "")
+
+	for name in names:
+		if name and cmds.objExists(ns + name + "_mod"):
+			return name
+
+	if names:
+		return names[0]
+
+	return ""
+
+# старое имя - его ждут скрипты, настроенные на rs_switchIkFk
+getModuleNameFromAttr = getModuleName
 
 def getInternalNameFromControl(controlName):
 	if cmds.objExists(controlName+".internalName"):
@@ -50,17 +72,30 @@ def getControlNameFromInternal(module_name, internalControlName):
 	# print ("---", module_name)
 	ctrls = getSetObjects(module_name+'_moduleControlSet')
 	# print ("---", module_name, internalControlName, ctrls)
+
+	# Сначала строгое совпадение - по internalName И moduleName (поведение
+	# rs_switchIkFk). Нужно там, где в moduleControlSet попадают контролы
+	# соседнего модуля с тем же internalName.
+	fallback = ""
 	for c in ctrls:
 		#print c
 		#if c == 'l_footB_heelFk':
 			#print c
 		try:
 			int_name = cmds.getAttr(c+".internalName")
-			if int_name == internalControlName:
+			if int_name != internalControlName:
+				continue
+			if not fallback:
+				fallback = c
+			mod_name = cmds.getAttr(c+".moduleName")
+			#print mod_name, c, int_name, module_name
+			if mod_name == module_name.split(':')[-1]:
 				return c
 		except: pass
+
+	# .moduleName на контролах может не быть - тогда хватает internalName
 	#cmds.warning('Cannot find control with internal name '+internalControlName+' in moduleControlSet')
-	return ""
+	return fallback
 
 def getSetObjects(set):
 	objects = []
@@ -151,12 +186,48 @@ def getConnectedFootModule(control):
 
 def objectType(node):
 	type = cmds.objectType(node)
-	
+
 	version = int(cmds.about(v=True).split(" ")[0])
 	if version >= 2026:
 		if type == "multDL": type = "multDoubleLinear"
 
 	return type
+
+def getModuleScale(m_name):
+	# Мировой масштаб модуля - нужен, чтобы отступ aim-контрола не зависел от
+	# размера персонажа.
+	# <модуль>_mainPoser_decomposeMatrix - своя нода модуля, её создавала версия
+	# 1.0.7-3 по требованию; в 1.0.8 создание потерялось, и на ригах, где ноды
+	# нет, from_fk_to_ik падал.
+	# <модуль>_posers_decMat - вариант rs_switchIkFk. Это НЕ то же самое: он
+	# раскладывает mainPoser РОДИТЕЛЬСКОГО модуля (l_arm_posers_decMat <-
+	# l_shoulder_mainPoser), поэтому берём его последним, только если своего
+	# mainPoser нет вовсе.
+	decMat = m_name + '_mainPoser_decomposeMatrix'
+	if cmds.objExists(decMat):
+		return cmds.getAttr(decMat + '.outputScaleX')
+
+	if cmds.objExists(m_name + '_mainPoser'):
+		cmds.createNode('decomposeMatrix', n=decMat)
+		cmds.connectAttr(m_name + '_mainPoser.worldMatrix[0]', decMat + '.inputMatrix')
+		return cmds.getAttr(decMat + '.outputScaleX')
+
+	old_decMat = m_name + '_posers_decMat'
+	if cmds.objExists(old_decMat):
+		return cmds.getAttr(old_decMat + '.outputScaleX')
+
+	cmds.warning('Cannot find scale node for module ' + m_name + ', using 1.0')
+	return 1.0
+
+def isReversedAttr(control, attr):
+	# Флаг reverse_<attr> на контроле: так старые риги (rs_switchIkFk) задают,
+	# какие каналы инвертируются при зеркалировании. На новых ригах атрибута нет
+	# и проверка молча даёт False, поэтому ветка безопасна для обоих поколений.
+	if attr not in mirrorAttrLis:
+		return False
+	if not cmds.attributeQuery( 'reverse_'+attr, node=control, exists=True ):
+		return False
+	return cmds.getAttr(control + '.reverse_'+attr) == 1
 
 ##################################
 # Switch IKFK
@@ -337,8 +408,8 @@ def from_fk_to_ik(control):
 
 		# Make vector as needed length and from b point and final Point elbow control
 		if cmds.objExists(m_name+'_mod.aim_offset'):
-			scale = cmds.getAttr(m_name+'_mainPoser_decomposeMatrix.outputScaleX')
-			offset = cmds.getAttr(m_name+'_mod.aim_offset') * scale 
+			scale = getModuleScale(m_name)
+			offset = cmds.getAttr(m_name+'_mod.aim_offset') * scale
 		else:
 			offset = 0.5
 		
@@ -1066,7 +1137,10 @@ def symmetry():
 				attrVar = cmds.getAttr(control + "." + attr)
 
 				try:
-					cmds.setAttr((ns + target + "." + attr), attrVar)
+					if isReversedAttr(control, attr):
+						cmds.setAttr((ns + target + "." + attr), attrVar*-1)
+					else:
+						cmds.setAttr((ns + target + "." + attr), attrVar)
 				except:
 					print (target, "cannot modify")
 					pass
@@ -1186,7 +1260,7 @@ def mirrorByConstraint(source, target, ns):
 	cmds.parent(loc2_2, loc2)
 
 	if not ik_symmetry:
-		cmds.setAttr(loc2+".rx", 180)
+		cmds.setAttr(loc2_2+".rx", 180)
 	
 	if not cmds.getAttr(source+'.tx', lock=True) and not cmds.getAttr(source+'.rx', lock=True):
 		con = cmds.parentConstraint(loc2_2, source, mo=0)
@@ -1389,8 +1463,12 @@ def mirror():
 				
 				try:
 					old_value = cmds.getAttr(ns + target + "." + attr)
-					cmds.setAttr((ns + target + "." + attr), attrVar)
-					cmds.setAttr((control + "." + attr), old_value)
+					if isReversedAttr(control, attr):
+						cmds.setAttr((ns + target + "." + attr), attrVar*-1)
+						cmds.setAttr((control + "." + attr), old_value*-1)
+					else:
+						cmds.setAttr((ns + target + "." + attr), attrVar)
+						cmds.setAttr((control + "." + attr), old_value)
 				except:
 					print (target, "cannot modify", attr)
 					pass
@@ -1487,3 +1565,104 @@ def hasWorldParent(control):
 	return "world" in parents
 	
 	
+
+##################################
+# Mirror animation
+##################################
+
+# Перенесено из rs_switchIkFk.py при слиянии модулей.
+def mirror_animation():
+	
+	sel = cmds.ls(sl=1) 
+	
+	if len(sel) == 0:
+		return
+	
+	c = sel[0]
+	name = c.split(":")[-1]
+	ns = c.split(name)[0]
+	dum = ns+"mirrorAnimDummy"
+	
+	mirrored = []
+	
+	window = cmds.window(t='Mirroring animation')
+	cmds.columnLayout()
+	if len(sel) > 1:
+		progressControl = cmds.progressBar(maxValue=len(sel)-1, width=300)
+	else:
+		progressControl = cmds.progressBar(maxValue=1, width=300)
+	cmds.showWindow( window )
+	
+	for c in sel:
+		cmds.progressBar(progressControl, edit=True, step=1)
+		
+		name = c.split(":")[-1]
+	
+		side = name.split("_")[0]
+		
+		c_l = None
+		if side == "l":
+			c_l = c
+			c_r = ns+"r"+name[1:]
+		elif side == "r":
+			c_r = c
+			c_l = ns+"l"+name[1:]
+			
+			
+		if c_l:
+			if c_l in mirrored or c_r in mirrored:
+				continue
+	
+		if side in ["l", "r"]:
+			cmds.cutKey(dum)
+	
+			if not cmds.copyKey(c_l):
+				cmds.select(c_l)
+				cmds.SetKey(c_l)
+			cmds.copyKey(c_l)
+			cmds.pasteKey(dum, option="replaceCompletely")
+			if isReversedAttr(c_l, "translateX"):
+				cmds.scaleKey(dum+".translateX", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			if isReversedAttr(c_l, "translateY"):
+				cmds.scaleKey(dum+".translateY", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			if isReversedAttr(c_l, "translateZ"):
+				cmds.scaleKey(dum+".translateZ", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			if isReversedAttr(c_l, "rotateX"):
+				cmds.scaleKey(dum+".rotateX", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			if isReversedAttr(c_l, "rotateY"):
+				cmds.scaleKey(dum+".rotateY", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			if isReversedAttr(c_l, "rotateZ"):
+				cmds.scaleKey(dum+".rotateZ", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+	
+			if not cmds.copyKey(c_r):
+				cmds.select(c_r)
+				cmds.SetKey(c_r)
+			cmds.copyKey(c_r)
+			cmds.pasteKey(c_l, option="replaceCompletely")
+			if isReversedAttr(c_l, "translateX"):
+				cmds.scaleKey(c_l+".translateX", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			if isReversedAttr(c_l, "translateY"):
+				cmds.scaleKey(c_l+".translateY", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			if isReversedAttr(c_l, "translateZ"):
+				cmds.scaleKey(c_l+".translateZ", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			if isReversedAttr(c_l, "rotateX"):
+				cmds.scaleKey(c_l+".rotateX", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			if isReversedAttr(c_l, "rotateY"):
+				cmds.scaleKey(c_l+".rotateY", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			if isReversedAttr(c_l, "rotateZ"):
+				cmds.scaleKey(c_l+".rotateZ", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)            
+	
+			cmds.copyKey(dum)
+			cmds.pasteKey(c_r, option="replaceCompletely")
+	
+			mirrored.append(c_l)
+			mirrored.append(c_r)
+	
+		else:        
+			cmds.scaleKey(c+".translateX", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			cmds.scaleKey(c+".rotateY", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)
+			cmds.scaleKey(c+".rotateZ", timeScale=0, timePivot=0, valueScale=-1, valuePivot=0)    
+	
+	
+	# delete progress window
+	cmds.deleteUI(window)	

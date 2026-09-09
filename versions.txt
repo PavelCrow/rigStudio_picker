@@ -113,3 +113,12 @@ returned file rs_switchIkFk.py
 
 --- Version 1.0.8 ---
 updated switchIkFk.py 
+
+--- Version 1.0.9 ---
+merged rs_switchIkFk.py into switchIkFk.py, rs_switchIkFk is a shim now
+fixed switch fk to ik on rigs without <module>_mainPoser_decomposeMatrix
+fixed mirror flip on the source side
+returned reverse_<attr> support and mirror_animation from rs_switchIkFk
+item script errors now print a traceback instead of a bare warning
+view pan and zoom are stored per picker, not per tab name
+zoom reset button centers the current tab by its content
