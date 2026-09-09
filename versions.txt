@@ -115,13 +115,13 @@ returned file rs_switchIkFk.py
 updated switchIkFk.py 
 
 --- Version 1.0.9 ---
-merged rs_switchIkFk.py into switchIkFk.py, rs_switchIkFk is a shim now
-fixed switch fk to ik on rigs without <module>_mainPoser_decomposeMatrix
-fixed mirror flip on the source side
-returned reverse_<attr> support and mirror_animation from rs_switchIkFk
-item script errors now print a traceback instead of a bare warning
-view pan and zoom are stored per picker, not per tab name
-zoom reset button centers the current tab by its content
-fixed mirror flip axis for ik hand controls, set mirrorFlipAxis on a control to override
-switchIkFk.py is reloaded with the picker, edits no longer need a Maya restart
-fixed restoring view position on picker restart
+слиты rs_switchIkFk.py и switchIkFk.py, rs_switchIkFk теперь заглушка над ним
+исправлено переключение fk в ik на ригах без ноды <модуль>_mainPoser_decomposeMatrix
+исправлено зеркалирование исходной стороны
+возвращены поддержка reverse_<атрибут> и mirror_animation из rs_switchIkFk
+ошибки в скриптах кнопок печатают трейсбек вместо голого предупреждения
+положение и зум вида хранятся отдельно для каждого пикера, а не по имени вкладки
+кнопка сброса зума центрирует текущую вкладку по её содержимому
+исправлена ось разворота при зеркалировании ik контролов кисти, ось задаётся атрибутом mirrorFlipAxis на контроле
+switchIkFk.py перезагружается вместе с пикером, правки больше не требуют перезапуска Maya
+исправлено восстановление положения вида после перезапуска пикера

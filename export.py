@@ -1,6 +1,6 @@
 import maya.cmds as cmds
 import shutil
-import os, imp, subprocess
+import os, imp, io, subprocess
 
 def run(clearPy=False):
     result = cmds.confirmDialog( title='Confirm', message='Export RS Picker to archive?', button=['Yes','No'], defaultButton='Yes', cancelButton='No', dismissString='No' )
@@ -11,7 +11,7 @@ def run(clearPy=False):
     picker_folder = os.path.abspath(imp.find_module(fileName)[1])	 	#'C:\Users\Pavel\Dropbox\mayaScripts/rigStudio'
     
     # get version
-    with open(picker_folder+'/versions.txt') as f:
+    with io.open(picker_folder+'/versions.txt', encoding='utf-8', errors='replace') as f:
         lines = f.readlines()
     versions = []
     for l in lines:

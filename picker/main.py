@@ -1,4 +1,4 @@
-import os, re, imp, types, weakref, json
+import os, re, imp, io, types, weakref, json
 from datetime import datetime, timedelta
 from math import sin, cos, pi
 from functools import partial
@@ -4063,7 +4063,7 @@ class MyDockingUI(QtWidgets.QWidget):
 		return ui	
 
 	def get_version(self):
-		with open(root_path.replace('\\picker', "/versions.txt")) as f:
+		with io.open(root_path.replace('\\picker', "/versions.txt"), encoding="utf-8", errors="replace") as f:
 			lines = f.readlines()
 
 		versions = []
@@ -6841,7 +6841,7 @@ class MyDockingUI(QtWidgets.QWidget):
 		self.aboutWin.pushButton.clicked.connect(aboutClose)
 
 		# get version
-		with open(root_path.replace('\\picker', "/versions.txt")) as f:
+		with io.open(root_path.replace('\\picker', "/versions.txt"), encoding="utf-8", errors="replace") as f:
 			lines = f.readlines()
 
 		versions = []
